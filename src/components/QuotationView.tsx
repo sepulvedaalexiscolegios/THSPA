@@ -8,7 +8,7 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export function QuotationView() {
+export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -20,12 +20,15 @@ export function QuotationView() {
   const [quoteItems, setQuoteItems] = useState<QuotationItem[]>([]);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   
   // Customer Modal State (within Quotation)
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [suggestedSku, setSuggestedSku] = useState('');
+  const [selectedProductCategory, setSelectedProductCategory] = useState('');
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
@@ -56,8 +59,42 @@ export function QuotationView() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isProductModalOpen) {
+      // Find the highest ACC- number among all products (not just those already in state if they haven't loaded yet)
+      const accProducts = products.filter(p => p.sku && p.sku.startsWith('ACC-'));
+      if (accProducts.length > 0) {
+        const numbers = accProducts.map(p => {
+          const match = p.sku.match(/ACC-(\d+)/);
+          return match ? parseInt(match[1]) : 0;
+        }).filter(n => !isNaN(n));
+        
+        const maxNum = numbers.length > 0 ? Math.max(...numbers) : 100;
+        // Ensure starting at 101 if no valid numbers found
+        const nextNum = Math.max(maxNum, 100) + 1;
+        setSuggestedSku(`ACC-${nextNum}`);
+      } else {
+        setSuggestedSku('ACC-101');
+      }
+    }
+  }, [isProductModalOpen, products]);
+
+  // Use global search if provided, otherwise local search
+  const effectiveSearch = globalSearch !== undefined ? globalSearch : searchTerm;
+
+  const filteredQuotations = quotations.filter(q => {
+    const customer = customers.find(c => c.id === q.customer_id);
+    const customerName = (customer?.name || '').toLowerCase();
+    const qIndex = quotations.findIndex(x => x.id === q.id);
+    const qNumber = 20100 + (quotations.length - qIndex);
+    const search = effectiveSearch.toLowerCase();
+    
+    return customerName.includes(search) || qNumber.toString().includes(search);
+  });
+
   const fetchData = async () => {
     try {
+      console.log('Fetching all necessary data for QuotationView...');
       const [qRes, cRes, pRes, catRes, subRes] = await Promise.all([
         supabase.from('quotations').select('*').order('date', { ascending: false }),
         supabase.from('customers').select('*').order('name'),
@@ -66,17 +103,25 @@ export function QuotationView() {
         supabase.from('subcategories').select('*').order('name')
       ]);
 
-      if (qRes.error) throw qRes.error;
-      if (cRes.error) throw cRes.error;
-      if (pRes.error) throw pRes.error;
-      if (catRes.error) throw catRes.error;
-      if (subRes.error) throw subRes.error;
+      if (qRes.error) console.error('Error fetching quotations:', qRes.error);
+      if (cRes.error) console.error('Error fetching customers:', cRes.error);
+      if (pRes.error) console.error('Error fetching products:', pRes.error);
+      if (catRes.error) console.error('Error fetching categories:', catRes.error);
+      if (subRes.error) console.error('Error fetching subcategories:', subRes.error);
 
       if (qRes.data) setQuotations(qRes.data);
       if (cRes.data) setCustomers(cRes.data);
       if (pRes.data) setProducts(pRes.data);
       if (catRes.data) setCategories(catRes.data);
       if (subRes.data) setSubcategories(subRes.data);
+
+      console.log('Data loaded:', {
+        quotations: qRes.data?.length,
+        customers: cRes.data?.length,
+        products: pRes.data?.length,
+        categories: catRes.data?.length,
+        subcategories: subRes.data?.length
+      });
     } catch (err: any) {
       console.error('Error fetching quotation data:', err);
     }
@@ -207,7 +252,6 @@ export function QuotationView() {
       price: Number(formData.get('price')),
       cost_price: Number(formData.get('costPrice')),
       stock: Number(formData.get('stock')),
-      min_stock: Number(formData.get('minStock')),
     };
 
     try {
@@ -222,9 +266,10 @@ export function QuotationView() {
       setProducts(prev => [newProduct, ...prev]);
       setIsProductModalOpen(false);
       setSearchProduct(newProduct.sku);
-    } catch (error) {
+      showAlert("Éxito", "Producto creado correctamente en el inventario.", "success");
+    } catch (error: any) {
       console.error('Error saving product:', error);
-      alert('Error al guardar el producto');
+      showAlert("Error", "No se pudo guardar el producto: " + (error.message || "Error desconocido"));
     }
   };
 
@@ -1025,17 +1070,25 @@ export function QuotationView() {
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">SKU / Código</label>
-                      <input name="sku" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <input 
+                        name="sku" 
+                        defaultValue={suggestedSku} 
+                        key={suggestedSku}
+                        required 
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Actual</label>
-                      <input name="stock" type="number" defaultValue="0" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <input name="stock" type="number" defaultValue="0" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Categoría</label>
                       <select 
                         name="category" 
                         required
+                        value={selectedProductCategory}
+                        onChange={(e) => setSelectedProductCategory(e.target.value)}
                         className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none"
                       >
                         <option value="">Seleccionar</option>
@@ -1051,21 +1104,24 @@ export function QuotationView() {
                         className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none"
                       >
                         <option value="">Otras</option>
-                        {subcategories.map(sub => (
-                          <option key={sub.id} value={sub.name}>{sub.name}</option>
-                        ))}
+                        {subcategories
+                          .filter(sub => {
+                            if (!selectedProductCategory) return true;
+                            const cat = categories.find(c => c.name === selectedProductCategory);
+                            return cat ? sub.category_id === cat.id : true;
+                          })
+                          .map(sub => (
+                            <option key={sub.id} value={sub.name}>{sub.name}</option>
+                          ))}
                       </select>
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Costo</label>
-                      <input name="costPrice" type="number" defaultValue="0" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <input name="costPrice" type="number" defaultValue="0" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
-                      <input name="price" type="number" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
-                    </div>
-                    <div className="hidden">
-                      <input name="minStock" type="hidden" value="0" />
+                      <input name="price" type="number" defaultValue="0" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                   </div>
 

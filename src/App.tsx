@@ -40,6 +40,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState('');
 
   useEffect(() => {
     // Get initial session
@@ -317,7 +318,9 @@ export default function App() {
                <Search className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 w-5 h-5 top-1/2 -translate-y-1/2" />
                <input 
                 type="text" 
-                placeholder="Buscar..." 
+                placeholder="Buscar por cliente o N°..." 
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
                 className="block w-full pl-10 pr-3 py-1.5 border border-slate-300 rounded-md leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-xs" 
                />
              </div>
@@ -342,7 +345,7 @@ export default function App() {
             >
               {currentView === 'inventory' && <InventoryView />}
               {currentView === 'customers' && <CustomerView />}
-              {currentView === 'quotations' && <QuotationView />}
+              {currentView === 'quotations' && <QuotationView globalSearch={globalSearch} />}
               {currentView === 'sales' && <SalesView />}
               {currentView === 'parameters' && <ParametersView />}
               {currentView === 'conditions' && <ConditionsView />}

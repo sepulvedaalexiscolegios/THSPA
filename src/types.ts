@@ -5,7 +5,6 @@ export interface Product {
   category: string;
   subcategory: string;
   stock: number;
-  min_stock: number;
   price: number;
   cost_price: number;
   unit: string;

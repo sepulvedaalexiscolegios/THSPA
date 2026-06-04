@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Scan, Filter, Trash2, Edit2, AlertCircle, X, Upload } from 'lucide-react';
+import { Plus, Search, Scan, Filter, Trash2, Edit2, AlertCircle, X, Upload, CheckCircle2 } from 'lucide-react';
 import { Product, Category, Subcategory } from '../types';
 import { Scanner } from './Scanner';
 import { formatCurrency, cn } from '../lib/utils';
@@ -16,12 +16,18 @@ export function InventoryView() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [suggestedSku, setSuggestedSku] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const txtInputRef = useRef<HTMLInputElement>(null);
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'error') => {
+    setAlertConfig({ title, message, type });
+  };
 
   useEffect(() => {
     fetchData();
@@ -70,7 +76,6 @@ export function InventoryView() {
       price: Number(formData.get('price')),
       cost_price: Number(formData.get('costPrice')),
       stock: Number(formData.get('stock')),
-      min_stock: Number(formData.get('minStock')),
     };
 
     try {
@@ -93,10 +98,11 @@ export function InventoryView() {
       }
       setIsModalOpen(false);
       setEditingProduct(null);
+      showAlert("Éxito", editingProduct ? 'Producto actualizado con éxito' : 'Producto creado con éxito', "success");
       fetchData();
     } catch (err: any) {
       console.error('Save Product Error:', err);
-      alert('Error al guardar producto. Verifique los datos o contacte a soporte.');
+      showAlert("Error", 'No se pudo guardar el producto: ' + (err.message || 'Error desconocido'));
     }
   };
 
@@ -165,7 +171,6 @@ export function InventoryView() {
             price: Number(parts[4] || 0),
             cost_price: Number(parts[5] || 0),
             stock: Number(parts[6] || 0),
-            min_stock: Number(parts[7] || 0),
             unit: parts[8] || 'Unidad'
           });
         });
@@ -255,7 +260,6 @@ export function InventoryView() {
             price: Number(getValue(['Precio', 'precio', 'Price', 'price', 'VALOR', 'valor', 'COSTO', 'costo', 'VENTA', 'P. VENTA', 'PRECIO VENTA'], 0)),
             cost_price: Number(getValue(['Costo', 'costo', 'Cost', 'CostPrice', 'CostPrice', 'PRECIO COSTO', 'P. COSTO', 'VALOR COSTO'], 0)),
             stock: Number(getValue(['Stock', 'stock', 'Existencia', 'existencia', 'CANTIDAD', 'cantidad', 'QUANTITY', 'qty', 'STOCK ACTUAL'], 0)),
-            min_stock: Number(getValue(['StockMinimo', 'stockminimo', 'MinStock', 'minstock', 'STOCK MINIMO', 'MIN', 'minimo', 'Alerta', 'MINIMO'], 0)),
             unit: String(getValue(['Unidad', 'unidad', 'Unit', 'unit', 'UM', 'U.M.', 'FORMATO'], 'Unidad')),
           });
         });
@@ -301,6 +305,24 @@ export function InventoryView() {
     const matchesSubcategory = selectedSubcategory === 'all' || p.subcategory === selectedSubcategory;
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
+
+  useEffect(() => {
+    if (isModalOpen && !editingProduct) {
+      const accProducts = products.filter(p => p.sku && p.sku.startsWith('ACC-'));
+      if (accProducts.length > 0) {
+        const numbers = accProducts.map(p => {
+          const match = p.sku.match(/ACC-(\d+)/);
+          return match ? parseInt(match[1]) : 0;
+        }).filter(n => !isNaN(n));
+        
+        const maxNum = numbers.length > 0 ? Math.max(...numbers) : 100;
+        const nextNum = Math.max(maxNum, 100) + 1;
+        setSuggestedSku(`ACC-${nextNum}`);
+      } else {
+        setSuggestedSku('ACC-101');
+      }
+    }
+  }, [isModalOpen, editingProduct, products]);
 
   const uniqueCategories = Array.from(new Set(products.map(p => p.category))).sort();
   const uniqueSubcategories = Array.from(new Set(products.filter(p => selectedCategory === 'all' || p.category === selectedCategory).map(p => p.subcategory))).sort();
@@ -352,35 +374,10 @@ export function InventoryView() {
             <span>TXT</span>
           </button>
 
-          <button 
-            onClick={handleClearInventory}
-            className="flex items-center justify-center gap-2 bg-slate-50 text-red-600 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-red-50 border border-slate-200 transition-all active:scale-95"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Vaciar</span>
-          </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">Total Productos</div>
-          <div className="text-xl md:text-2xl font-black text-slate-800">{products.length}</div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="text-[10px] font-bold text-red-400 uppercase mb-1 tracking-widest">Stock Crítico</div>
-          <div className="text-xl md:text-2xl font-black text-red-600">
-            {products.filter(p => p.stock <= p.min_stock).length}
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm col-span-2 lg:col-span-2">
-          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">Valorización Total</div>
-          <div className="text-xl md:text-2xl font-black text-emerald-600">
-            {formatCurrency(products.reduce((acc, p) => acc + (p.price * p.stock), 0))}
-          </div>
-        </div>
-      </div>
+      {/* Stats Cards Section Removed */}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-3 border-b border-slate-100 flex flex-col gap-3 bg-slate-50/50">
@@ -434,9 +431,8 @@ export function InventoryView() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredProducts.map((p) => {
-                const isUnderStock = p.stock <= p.min_stock;
                 return (
-                  <tr key={p.id} className={cn("hover:bg-slate-50/50 transition-colors", isUnderStock && "bg-red-50/30")}>
+                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-4">
                       <div className="text-xs md:text-sm font-bold text-slate-700 leading-tight">{p.name}</div>
                       <div className="text-[9px] md:text-[10px] font-mono text-slate-400 mt-0.5 uppercase tracking-tighter">SKU: {p.sku}</div>
@@ -446,15 +442,9 @@ export function InventoryView() {
                       <div className="text-[9px] text-slate-400 uppercase">{p.subcategory || 'Sin Subcategoría'}</div>
                     </td>
                     <td className="px-4 py-4 text-center">
-                      <span className={cn(
-                        "inline-block px-2 py-1 rounded text-xs font-black",
-                        isUnderStock ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-700"
-                      )}>
+                      <span className="inline-block px-2 py-1 rounded text-xs font-black bg-slate-100 text-slate-700">
                         {p.stock}
                       </span>
-                      {isUnderStock && (
-                        <div className="text-[8px] text-red-500 font-bold uppercase mt-0.5">Stock Crítico</div>
-                      )}
                     </td>
                     <td className="px-4 py-4 text-right text-[11px] md:text-xs font-medium text-slate-500 italic whitespace-nowrap">
                       {formatCurrency(p.cost_price || 0)}
@@ -567,7 +557,13 @@ export function InventoryView() {
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">SKU / Cód. Barras</label>
                       <div className="relative">
-                        <input name="sku" defaultValue={editingProduct?.sku} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                        <input 
+                          name="sku" 
+                          defaultValue={editingProduct?.sku || suggestedSku} 
+                          key={editingProduct?.id || suggestedSku}
+                          required 
+                          className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" 
+                        />
                         <button type="button" onClick={() => setIsScannerOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-sky-600">
                           <Scan className="w-4 h-4" />
                         </button>
@@ -609,19 +605,15 @@ export function InventoryView() {
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Actual</label>
-                      <input name="stock" type="number" defaultValue={editingProduct?.stock} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <input name="stock" type="number" defaultValue={editingProduct?.stock ?? 0} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Costo</label>
-                      <input name="costPrice" type="number" defaultValue={editingProduct?.cost_price} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <input name="costPrice" type="number" defaultValue={editingProduct?.cost_price ?? 0} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
-                      <input name="price" type="number" defaultValue={editingProduct?.price} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Crítico (Alerta)</label>
-                      <input name="minStock" type="number" defaultValue={editingProduct?.min_stock} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <input name="price" type="number" defaultValue={editingProduct?.price ?? 0} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-slate-900 text-white py-3.5 md:py-2.5 rounded-xl md:rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 mt-2 active:scale-95 transition-all uppercase">
@@ -633,6 +625,52 @@ export function InventoryView() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {alertConfig && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-sm rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden border border-slate-200 text-center p-8"
+            >
+              <div className={cn(
+                "w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center",
+                alertConfig.type === 'success' ? "bg-emerald-100 text-emerald-600" : 
+                alertConfig.type === 'warning' ? "bg-amber-100 text-amber-600" :
+                "bg-red-100 text-red-600"
+              )}>
+                {alertConfig.type === 'success' ? <CheckCircle2 className="w-8 h-8" /> : 
+                 alertConfig.type === 'warning' ? <AlertCircle className="w-8 h-8" /> :
+                 <X className="w-8 h-8" />}
+              </div>
+              
+              <h3 className="text-lg font-black text-slate-800 mb-2">{alertConfig.title}</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed mb-6">
+                {alertConfig.message}
+              </p>
+              
+              <button 
+                onClick={() => setAlertConfig(null)}
+                className={cn(
+                  "w-full py-3 rounded-xl font-bold transition-all active:scale-95 text-white shadow-lg",
+                  alertConfig.type === 'success' ? "bg-emerald-600 shadow-emerald-200" : 
+                  alertConfig.type === 'warning' ? "bg-amber-600 shadow-amber-200" :
+                  "bg-slate-900 shadow-slate-200"
+                )}
+              >
+                Entendido
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

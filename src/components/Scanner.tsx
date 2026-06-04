@@ -39,7 +39,7 @@ export function Scanner({ onScan, onClose }: ScannerProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 p-4"
     >
       <div className="relative w-full max-w-md bg-white rounded-2xl overflow-hidden p-6">
         <button
