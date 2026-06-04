@@ -127,8 +127,8 @@ export function SalesView() {
               font-family: 'Inter', sans-serif; 
               margin: 0;
               padding: 0.5cm;
-              width: 16.2cm; /* 3/4 width of letter page */
-              height: 9.3cm; /* Roughly 1/3 of the page height */
+              width: 20.5cm; /* Full width of letter page minus margins */
+              height: 10cm; /* Optimized height */
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
@@ -139,11 +139,23 @@ export function SalesView() {
               padding: 0.4cm;
               flex: 1;
               display: flex;
-              gap: 0.4cm;
+              gap: 0.5cm;
               overflow: hidden;
             }
-            .left-col { flex: 1.2; min-width: 0; display: flex; flex-direction: column; }
-            .packing-col { width: 5.5cm; border-left: 1px dashed #ccc; padding-left: 0.3cm; overflow: hidden; display: flex; flex-direction: column; }
+            .packing-col { 
+              width: 66%; 
+              overflow: hidden; 
+              display: flex; 
+              flex-direction: column; 
+            }
+            .left-col { 
+              width: 33%; 
+              border-left: 1px dashed #ccc; 
+              padding-left: 0.4cm; 
+              display: flex; 
+              flex-direction: column; 
+              min-width: 0;
+            }
             
             h1 { margin: 0; font-size: 14pt; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             h2 { margin: 6pt 0 2pt 0; font-size: 9pt; font-weight: 900; background: #eee; padding: 1pt 4pt; }
@@ -179,15 +191,35 @@ export function SalesView() {
             }
             .packing-item {
               display: flex;
-              justify-content: space-between;
-              gap: 4pt;
+              align-items: flex-start;
+              gap: 3pt;
               border-bottom: 1px solid #f0f0f0;
               padding: 2pt 0;
             }
             .packing-item span {
-              font-size: 7pt;
+              font-size: 6.5pt;
               font-weight: 700;
               text-transform: uppercase;
+              line-height: 1;
+            }
+            .packing-sku {
+              width: 1.4cm;
+              font-size: 5.5pt !important;
+              color: #555;
+              overflow: hidden;
+              white-space: nowrap;
+            }
+            .packing-name {
+              flex: 1;
+              min-width: 0;
+              overflow-wrap: break-word;
+            }
+            .packing-qty {
+              white-space: nowrap;
+              font-weight: 900 !important;
+              font-size: 7pt !important;
+              width: 0.6cm;
+              text-align: right;
             }
             .packing-header {
               font-size: 8pt;
@@ -201,53 +233,48 @@ export function SalesView() {
         </head>
         <body>
           <div class="label-content">
-            <div class="left-col">
-              <h1>${company.name}</h1>
-              
-              <div style="display: flex; gap: 0.5cm;">
-                <div style="flex: 1;">
-                  <h2>REMITENTE</h2>
-                  <p>RUT: ${company.rut}</p>
-                  <p>DIR: ${company.address.slice(0, 40)}...</p>
-                  <p>TEL: ${company.phone}</p>
-                </div>
-                <div style="width: 4cm; text-align: center;">
-                   <div class="transport-badge">${transportName}</div>
-                   <p style="font-weight: 900; font-size: 7pt;">OV: #${saleCorrelative}</p>
-                   <p style="font-size: 7pt;">COT: #${quoteCorrelative}</p>
-                </div>
-              </div>
-              
-              <div style="margin: 0.2cm 0;"></div>
-
-              <h2>DESTINATARIO</h2>
-              <p style="font-size: 11pt; font-weight: 900;">${displayCustomerName}</p>
-              <p>RUT: ${displayCustomerRut}</p>
-              <p style="font-weight: 700;">DIRECCIÓN: ${saleCustomer?.address || 'N/A'}</p>
-              <p>TELÉFONO: ${saleCustomer?.phone || 'N/A'}</p>
-              
-              <div class="meta-section">
-                <div>
-                  <p style="font-size: 7pt; color: #666;">FECHA: ${format(new Date(sale.date), 'dd/MM/yyyy HH:mm')}</p>
-                </div>
-                <div style="text-align: right;">
-                   <p style="font-weight: 900; font-size: 8pt;">Bulto 1 de 1</p>
-                </div>
-              </div>
-            </div>
-            
             <div class="packing-col">
-              <div class="packing-header">PACKING LIST</div>
+              <div class="packing-header" style="text-align: left; font-size: 9pt;">LISTADO DE EMPAQUE (PACKING LIST)</div>
+              <div style="display: flex; gap: 4pt; font-size: 6pt; font-weight: 900; color: #888; text-transform: uppercase; border-bottom: 2px solid black; margin-bottom: 3pt; padding-bottom: 2pt;">
+                <span style="width: 2.2cm;">SKU / CÓDIGO</span>
+                <span style="flex: 1;">DESCRIPCIÓN DEL PRODUCTO</span>
+                <span style="width: 1cm; text-align: right;">CANT.</span>
+              </div>
               <div style="flex: 1; overflow: hidden;">
                 ${sale.items.map(item => `
                   <div class="packing-item">
-                    <span style="flex: 1;">${item.name}</span>
-                    <span style="white-space: nowrap;">x${item.qty}</span>
+                    <span class="packing-sku" style="width: 2.2cm; font-size: 6pt;">${item.sku}</span>
+                    <span class="packing-name" style="font-size: 7pt;">${item.name}</span>
+                    <span class="packing-qty" style="width: 1cm; font-size: 8pt;">x${item.qty}</span>
                   </div>
                 `).join('')}
               </div>
-              <div style="font-size: 7pt; font-weight: 900; border-top: 1px solid black; padding-top: 2pt; text-align: right;">
-                TOTAL ITEMS: ${sale.items.reduce((acc, i) => acc + i.qty, 0)}
+              <div class="meta-section" style="border-top: 2px solid black; margin-top: 4pt; padding-top: 4pt; font-size: 7pt; font-weight: 700; display: flex; justify-content: space-between;">
+                <span>VTA #${saleCorrelative} / COT #${quoteCorrelative}</span>
+                <span>FECHA: ${new Date().toLocaleDateString('es-CL')}</span>
+                <span>ITEMS: ${sale.items.reduce((acc, item) => acc + item.qty, 0)}</span>
+              </div>
+            </div>
+
+            <div class="left-col">
+              <h1>${company.name}</h1>
+              <div class="transport-badge">${transportName}</div>
+              
+              <h2>DESTINATARIO</h2>
+              <p style="font-size: 11pt; font-weight: 900; margin: 4pt 0;">${displayCustomerName}</p>
+              <p>RUT: ${displayCustomerRut}</p>
+              <p style="font-weight: 700; margin-top: 4pt;">DIRECCIÓN: ${saleCustomer?.address || 'N/A'}</p>
+              <p>TELÉFONO: ${saleCustomer?.phone || 'N/A'}</p>
+              
+              <div style="margin-top: auto; border-top: 2px solid black; padding-top: 4pt;">
+                <h2>REMITENTE</h2>
+                <p style="font-size: 7.5pt;">${company.name}</p>
+                <p style="font-size: 7pt; color: #666;">DIR: ${company.address.slice(0, 35)}...</p>
+                <p style="font-size: 7pt; color: #666;">TEL: +569 717 44 262</p>
+                <div style="display: flex; justify-content: space-between; margin-top: 4pt; font-size: 8pt; font-weight: 900;">
+                   <span>COTIZ-${quoteCorrelative}</span>
+                   <span>${format(new Date(sale.date), 'dd/MM/yyyy')}</span>
+                </div>
               </div>
             </div>
           </div>
