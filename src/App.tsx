@@ -105,11 +105,11 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-gray-100"
+          className="w-full max-w-md bg-white rounded-3xl shadow-xl p-6 sm:p-8 border border-gray-100"
         >
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-sky-100 overflow-hidden border border-slate-100">
-              <img src="/logo.png" className="w-16 h-16 object-contain" alt="" onError={(e) => {
+              <img src="/Logo.png" className="w-16 h-16 object-contain" alt="" onError={(e) => {
                 e.currentTarget.style.display = 'none';
                 e.currentTarget.parentElement!.innerHTML = '<div class="text-slate-900 font-black text-2xl">TH</div>';
               }} />
@@ -189,7 +189,7 @@ export default function App() {
       {/* Mobile Header */}
       <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 w-full">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" className="w-8 h-8 object-contain" alt="Logo" />
+          <img src="/Logo.png" className="w-8 h-8 object-contain" alt="Logo" />
           <span className="font-bold text-slate-900">TH Comercial</span>
         </div>
         <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600">
@@ -219,10 +219,9 @@ export default function App() {
       >
         <div className="p-6 border-b border-slate-700 bg-slate-900">
           <div className="flex items-center gap-3">
-             <img src="/logo.png" className="w-10 h-10 object-contain invert brightness-0" alt="" onError={(e) => e.currentTarget.style.display = 'none'} />
+             <img src="/Logo.png" className="w-10 h-10 object-contain invert brightness-0" alt="" onError={(e) => e.currentTarget.style.display = 'none'} />
              <h1 className="text-xl font-bold text-white tracking-tight leading-none">TH Comercial</h1>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">Gestión de Hogar</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-4">
@@ -311,8 +310,9 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm shrink-0">
-          <div className="flex items-center gap-4 w-1/3">
+        <header className="h-auto md:h-16 bg-white border-b border-slate-200 flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 md:px-8 py-3 md:py-0 shadow-sm shrink-0 gap-3 md:gap-0">
+          <div className="flex items-center gap-4 w-full md:w-1/2">
+             <img src="/Logo.png" className="hidden md:block w-8 h-8 object-contain" alt="Logo" />
              <div className="relative w-full">
                <Search className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 w-5 h-5 top-1/2 -translate-y-1/2" />
                <input 
@@ -330,7 +330,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC] custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#F8FAFC] custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentView}
@@ -351,11 +351,11 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        <footer className="h-10 bg-slate-50 border-t border-slate-200 px-6 flex items-center justify-between shrink-0">
-          <div className="text-[10px] text-slate-400 font-medium">
+        <footer className="bg-slate-50 border-t border-slate-200 px-4 md:px-6 flex flex-col md:flex-row items-center justify-between shrink-0 py-3 md:py-3 gap-2 md:gap-0 w-full overflow-hidden">
+          <div className="text-[10px] text-slate-400 font-medium whitespace-nowrap text-center">
             &copy; {new Date().getFullYear()} TH Comercial S.A. | Cloud Distribution
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 uppercase tracking-tight">
               <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
               Terminal Online
