@@ -1,0 +1,1164 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { Plus, Search, FileText, Send, ShoppingCart, Trash2, X, ChevronRight, UserPlus, Edit2, Minus, AlertCircle, CheckCircle2, Printer } from 'lucide-react';
+import { Quotation, Customer, Product, QuotationItem } from '../types';
+import { formatCurrency, cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
+import React from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+export function QuotationView() {
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // New/Edit Quote State
+  const [editingQuotationId, setEditingQuotationId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [quoteItems, setQuoteItems] = useState<QuotationItem[]>([]);
+  const [searchCustomer, setSearchCustomer] = useState('');
+  const [searchProduct, setSearchProduct] = useState('');
+  
+  // Customer Modal State (within Quotation)
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+  // Custom Alert & Delete State
+  const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [quotationToDelete, setQuotationToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'error') => {
+    setAlertConfig({ title, message, type });
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    const qChannel = supabase.channel('quotations_all').on('postgres_changes', { event: '*', schema: 'public', table: 'quotations' }, () => fetchData()).subscribe();
+    const cChannel = supabase.channel('customers_all').on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => fetchData()).subscribe();
+    const pChannel = supabase.channel('products_all').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchData()).subscribe();
+
+    return () => {
+      supabase.removeChannel(qChannel);
+      supabase.removeChannel(cChannel);
+      supabase.removeChannel(pChannel);
+    };
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [qRes, cRes, pRes] = await Promise.all([
+        supabase.from('quotations').select('*').order('date', { ascending: false }),
+        supabase.from('customers').select('*').order('name'),
+        supabase.from('products').select('*').order('name')
+      ]);
+
+      if (qRes.error) throw qRes.error;
+      if (cRes.error) throw cRes.error;
+      if (pRes.error) throw pRes.error;
+
+      console.log('Quotation Data Loaded:', {
+        quotes: qRes.data?.length,
+        customers: cRes.data?.length,
+        products: pRes.data?.length
+      });
+
+      if (qRes.data) setQuotations(qRes.data);
+      if (cRes.data) setCustomers(cRes.data);
+      if (pRes.data) setProducts(pRes.data);
+    } catch (err: any) {
+      console.error('Error fetching quotation data:', err);
+    }
+  };
+
+  const total = quoteItems.reduce((acc, item) => acc + item.subtotal, 0);
+
+  const handleAddItem = (p: Product) => {
+    const existing = quoteItems.find(i => i.productId === p.id);
+    if (existing) {
+      setQuoteItems(quoteItems.map(i => 
+        i.productId === p.id ? { ...i, qty: i.qty + 1, subtotal: (i.qty + 1) * i.price } : i
+      ));
+    } else {
+      setQuoteItems([...quoteItems, {
+        productId: p.id,
+        name: p.name,
+        sku: p.sku,
+        qty: 1,
+        price: p.price,
+        subtotal: p.price
+      }]);
+    }
+  };
+
+  const handleRemoveItem = (productId: string) => {
+    setQuoteItems(quoteItems.filter(i => i.productId !== productId));
+  };
+
+  const updateItemQty = (productId: string, delta: number) => {
+    setQuoteItems(quoteItems.map(item => {
+      if (item.productId === productId) {
+        const newQty = Math.max(1, item.qty + delta);
+        return { ...item, qty: newQty, subtotal: newQty * item.price };
+      }
+      return item;
+    }));
+  };
+
+  const handleEditQuotation = (q: Quotation) => {
+    setEditingQuotationId(q.id);
+    const customer = customers.find(c => c.id === q.customer_id);
+    setSelectedCustomer(customer || null);
+    setQuoteItems(q.items);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveQuotation = async () => {
+    if (!selectedCustomer) {
+      showAlert("Validación", "Debe seleccionar un cliente para generar la cotización.", "warning");
+      return;
+    }
+    if (quoteItems.length === 0) {
+      showAlert("Validación", "Debe agregar al menos un producto a la cotización.", "warning");
+      return;
+    }
+
+    const data: any = {
+      customer_id: selectedCustomer.id,
+      customer_name: selectedCustomer.name,
+      date: new Date().toISOString(),
+      items: quoteItems,
+      total,
+      status: "sent"
+    };
+
+    try {
+      let error;
+      console.log('Attempting to save quotation...', { ...data, editingId: editingQuotationId });
+
+      if (editingQuotationId) {
+        const { error: updateError } = await supabase.from('quotations').update(data).eq('id', editingQuotationId);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase.from('quotations').insert([data]);
+        error = insertError;
+      }
+      
+      // If we have a column error, try to be specific about what's missing
+      if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
+        console.warn('Schema issues detected, trying partial save...', error.message);
+        
+        let partialData = { ...data };
+        
+        // Remove columns that might not exist based on error message
+        if (error.message.includes('customer_name')) {
+          delete partialData.customer_name;
+        } 
+        if (error.message.includes('customer_id')) {
+          delete partialData.customer_id;
+        }
+
+        let retry;
+        if (editingQuotationId) {
+          retry = await supabase.from('quotations').update(partialData).eq('id', editingQuotationId);
+        } else {
+          retry = await supabase.from('quotations').insert([partialData]);
+        }
+        
+        if (!retry.error) {
+          error = null;
+          showAlert("Aviso de Esquema", "Cotización guardada (algunas columnas de cliente no existen en su base de datos).", "warning");
+        } else {
+          error = retry.error;
+        }
+      }
+
+      if (error) throw error;
+
+      showAlert("Éxito", `Cotización ${editingQuotationId ? 'actualizada' : 'guardada'} correctamente.`, "success");
+      setIsModalOpen(false);
+      resetForm();
+      await fetchData();
+    } catch (err: any) {
+      console.error('Save Quotation Error:', err);
+      showAlert("Error Crítico", 'No se pudo guardar la cotización: ' + (err.message || 'Error desconocido'));
+    }
+  };
+
+  const handleSaveCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name') as string,
+      rut: formData.get('rut') as string,
+      email: formData.get('email') as string,
+      phone: formData.get('phone') as string,
+      address: formData.get('address') as string,
+    };
+
+    try {
+      if (editingCustomer) {
+        const { error } = await supabase.from('customers').update(data).eq('id', editingCustomer.id);
+        if (error) throw error;
+        // Update selected customer if we edited the one we were using
+        if (selectedCustomer?.id === editingCustomer.id) {
+          setSelectedCustomer({ ...editingCustomer, ...data } as Customer);
+          setSearchCustomer(data.name);
+        }
+      } else {
+        const { data: newCustomer, error } = await supabase.from('customers').insert([data]).select().single();
+        if (error) throw error;
+        if (newCustomer) {
+          setSelectedCustomer(newCustomer);
+          setSearchCustomer(newCustomer.name);
+        }
+      }
+      setIsCustomerModalOpen(false);
+      setEditingCustomer(null);
+      fetchData();
+      showAlert("Cliente Guardado", `El cliente ha sido ${editingCustomer ? 'actualizado' : 'registrado'} correctamente.`, "success");
+    } catch (err: any) {
+      showAlert("Error", 'Error al guardar cliente: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditingQuotationId(null);
+    setSelectedCustomer(null);
+    setQuoteItems([]);
+    setSearchCustomer('');
+    setSearchProduct('');
+  };
+
+  // Unified Label Logic
+  const getCustomerLabels = (customer?: Customer, fallbackName?: string) => {
+    let mainLabel = 'Cliente (Sin Registro)';
+    let subLabel = '';
+
+    if (customer) {
+      const nameClean = (customer.name || '').trim();
+      const rutClean = (customer.rut || '').trim();
+
+      // Robust Chilean RUT detection: Numeric, points, hyphens, and can end in 'K'
+      const looksLikeRut = (str: string) => {
+        const clean = str.replace(/[.-]/g, '');
+        return /^[0-9]+[0-9kK]?$/.test(clean) && clean.length >= 7 && clean.length <= 10;
+      };
+
+      const isNameLikeRut = looksLikeRut(nameClean);
+      const isRutLikeName = rutClean && !looksLikeRut(rutClean);
+      
+      // If name field looks like a RUT and RUT field looks like a Name, swap them for display
+      if (isNameLikeRut && isRutLikeName) {
+        mainLabel = rutClean;
+        subLabel = nameClean;
+      } else if (isNameLikeRut && !rutClean) {
+        // Only RUT provided in Name field
+        mainLabel = 'Cliente (RUT: ' + nameClean + ')';
+        subLabel = nameClean;
+      } else {
+        mainLabel = nameClean || 'Cliente (Sin Nombre)';
+        subLabel = rutClean || '';
+      }
+      
+      // Override for subLabel in list views if address is available
+      if (customer.address) subLabel = customer.address;
+    } else if (fallbackName) {
+      mainLabel = fallbackName;
+    }
+
+    return { mainLabel, subLabel };
+  };
+
+  const sendWhatsApp = (q: Quotation) => {
+    const customer = customers.find(c => c.id === q.customer_id);
+    if (!customer?.phone) {
+      showAlert("Aviso", "El cliente no tiene un teléfono registrado.", "warning");
+      return;
+    }
+    
+    const { mainLabel } = getCustomerLabels(customer, q.customer_name);
+    const firstName = (mainLabel || '').split(' ')[0].toUpperCase();
+    
+    const text = `👋 Hola ${firstName}, adjuntamos su cotización de TH Comercial:\n\n` +
+      q.items.map(i => `* ${i.name.toUpperCase()} (${i.qty} x ${formatCurrency(i.price)})`).join('\n') +
+      `\n💰 *TOTAL: ${formatCurrency(q.total)}*\n\n` +
+      `Desde ya, agradecemos su preferencia 🙌\n` +
+      `Comparto datos para el pago de cotización:\n\n` +
+      `🏦\n` +
+      `BANCO ESTADO\n` +
+      `CTA VISTA N° 29870066587\n` +
+      `TH SpA\n` +
+      `77.042.984-6\n` +
+      `contacto@thspa.cl`;
+    
+    const phone = customer.phone.replace(/\D/g, '');
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  const generatePDF = async (q: Quotation, correlative: number) => {
+    const customer = customers.find(c => c.id === q.customer_id);
+    const doc = new jsPDF();
+    
+    // Fetch general conditions from localStorage (with fallback to old key)
+    const conditions = localStorage.getItem('general_conditions') || localStorage.getItem('commercial_conditions') || 'Esta cotización tiene una validez de 5 días hábiles.';
+    
+    // Brand Colors
+    const primaryColor = [100, 116, 139]; // Gray/Slate for the "Huincha"
+    const accentColor = [56, 189, 248]; // Sky Blue for brand accents
+    const grayColor = [100, 116, 139]; // Slate 500
+    
+    // Table Config
+    const startYTable = 90;
+
+    // Header - TH SpA
+    doc.setFontSize(22);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TH SpA', 20, 25);
+    
+    // Company Info (Left)
+    doc.setFontSize(9);
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+    doc.setFont('helvetica', 'normal');
+    doc.text('77.042.984-6', 20, 32);
+    doc.text('Comercializadora de Articulos para el Hogar, Lanas y Accesorios.', 20, 37);
+    doc.text('De Las Alondras 11259, La Florida, Santiago.', 20, 42);
+    doc.text('+569 71744262 | contacto@thspa.cl', 20, 47);
+    
+    // Quotation Header (Right) - Replacing black/sky box with Gray (primaryColor)
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.roundedRect(140, 15, 50, 20, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.text('COTIZACIÓN', 165, 24, { align: 'center' });
+    doc.setFontSize(14);
+    doc.text(`N° ${correlative}`, 165, 31, { align: 'center' });
+    
+    // Date
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+    doc.setFontSize(9);
+    const dateStr = new Date(q.date).toLocaleDateString();
+    doc.text(`Fecha: ${dateStr}`, 145, 42);
+
+    // Divider
+    doc.setDrawColor(241, 245, 249);
+    doc.line(20, 55, 190, 55);
+    
+    // Client Info (Name, Phone, Address only)
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DATOS DEL CLIENTE', 20, 65);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    
+    // Use detection logic for PDF name
+    const { mainLabel: pdfCustomerName } = getCustomerLabels(customer, q.customer_name);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Nombre: ${pdfCustomerName}`, 20, 72);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Teléfono: ${customer?.phone || 'N/A'}`, 20, 77);
+    doc.text(`Dirección: ${customer?.address || 'N/A'}`, 20, 82);
+    
+    // Draw rounded background for table header
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.roundedRect(20, startYTable, 170, 10, 3, 3, 'F');
+
+    // Items Table
+    autoTable(doc, {
+      startY: startYTable,
+      head: [['SKU', 'PRODUCTO', 'CANT', 'PRECIO', 'SUBTOTAL']],
+      body: q.items.map(i => [
+        i.sku,
+        i.name,
+        i.qty.toString(),
+        formatCurrency(i.price),
+        formatCurrency(i.subtotal)
+      ]),
+      headStyles: {
+        fillColor: false, // Set to false to allow the roundedRect background to show
+        textColor: [255, 255, 255],
+        fontSize: 9,
+        halign: 'center',
+        fontStyle: 'bold',
+        minCellHeight: 10
+      },
+      styles: {
+        cellPadding: 3,
+        fontSize: 8,
+        lineColor: [241, 245, 249],
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        2: { halign: 'center' },
+        3: { halign: 'right' },
+        4: { halign: 'right' }
+      },
+      margin: { left: 20, right: 20 },
+      theme: 'grid',
+      tableLineColor: [241, 245, 249],
+      tableLineWidth: 0.1,
+    });
+    
+    // Summary
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`TOTAL: ${formatCurrency(q.total)}`, 190, finalY, { align: 'right' });
+    
+    // Bank Details Footer
+    const footerY = doc.internal.pageSize.height - 65;
+    doc.setDrawColor(240, 240, 240);
+    doc.line(20, footerY - 5, 190, footerY - 5);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DATOS PARA TRANSFERENCIA BANCARIA', 20, footerY);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(grayColor[0], grayColor[1], grayColor[2]);
+    doc.text('BANCO ESTADO', 20, footerY + 6);
+    doc.text('CTA VISTA N° 29870066587', 20, footerY + 11);
+    doc.text('TH SpA', 20, footerY + 16);
+    doc.text('77.042.984-6', 20, footerY + 21);
+    doc.text('Contacto@thspa.cl', 20, footerY + 26);
+    
+    // Commercial Conditions (Smaller text at bottom)
+    const conditionsY = doc.internal.pageSize.height - 25;
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184); // Slate 400
+    const splitConditions = doc.splitTextToSize(conditions, 170);
+    doc.text(splitConditions, 20, conditionsY);
+ 
+    // Save PDF
+    doc.save(`Cotizacion_TH_${correlative}_${pdfCustomerName.replace(/ /g, '_')}.pdf`);
+  };
+
+  const handleAcceptQuote = async (q: Quotation) => {
+    try {
+      // 1. Update quote status
+      const { error: qError } = await supabase.from('quotations').update({ status: 'accepted' }).eq('id', q.id);
+      if (qError) throw qError;
+      
+      // 2. Create Sale
+      const saleData = {
+        quotation_id: q.id,
+        customer_id: q.customer_id,
+        date: new Date().toISOString(),
+        items: q.items,
+        total: q.total,
+        status: 'paid'
+      };
+
+      let { error: sError } = await supabase.from('sales').insert([saleData]);
+      
+      if (sError && (sError.message.includes('column') || sError.message.includes('schema cache'))) {
+        console.warn('Sales schema mismatch, attempting robust fallback...', sError.message);
+        
+        let fallbackData = { ...saleData };
+        
+        // Remove quotation_id if it's the one causing issues
+        if (sError.message.includes('quotation_id')) {
+          delete (fallbackData as any).quotation_id;
+        }
+        // Remove customer_id if it's the one causing issues
+        if (sError.message.includes('customer_id')) {
+          delete (fallbackData as any).customer_id;
+        }
+
+        let retry = await supabase.from('sales').insert([fallbackData]);
+        
+        // If it still fails, try a minimal version (no relations)
+        if (retry.error && (retry.error.message.includes('column') || retry.error.message.includes('schema cache'))) {
+           const { quotation_id, customer_id, ...minimalSale } = saleData as any;
+           retry = await supabase.from('sales').insert([minimalSale]);
+        }
+        
+        if (!retry.error) {
+          sError = null;
+          console.log('Sale created via fallback mechanism');
+        } else {
+          sError = retry.error;
+        }
+      }
+
+      if (sError) throw sError;
+
+      // 3. Update Inventory (Subtract stock)
+      for (const item of q.items) {
+        const { data: productsData } = await supabase.from('products').select('stock').eq('sku', item.sku).single();
+        if (productsData) {
+          await supabase.from('products').update({
+            stock: Math.max(0, (productsData.stock || 0) - item.qty)
+          }).eq('sku', item.sku);
+        }
+      }
+
+      showAlert("¡Venta Realizada!", "Cotización aceptada. Se ha generado un Ticket de Venta e inventario actualizado.", "success");
+      fetchData();
+    } catch (err: any) {
+      showAlert("Error", 'Error al procesar la venta: ' + err.message);
+    }
+  };
+
+  const handleDeleteQuotation = async () => {
+    if (!quotationToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      console.log('--- START DELETE OPERATION ---');
+      console.log('ID to delete:', quotationToDelete);
+      
+      const { error, status } = await supabase
+        .from('quotations')
+        .delete()
+        .eq('id', quotationToDelete);
+      
+      if (error) {
+        console.error('Supabase Delete Error:', error);
+        throw error;
+      }
+
+      console.log('Delete successful, status:', status);
+      
+      // Close delete modal first to not obscure the alert
+      setQuotationToDelete(null);
+      showAlert("Eliminado", "La cotización ha sido borrada exitosamente.", "success");
+      
+      // Force refresh
+      await fetchData();
+    } catch (err: any) {
+      console.error('CRITICAL DELETE ERROR:', err);
+      showAlert("Error de Eliminación", `No se pudo eliminar: ${err.message || 'Error desconocido'}`);
+    } finally {
+      setIsDeleting(false);
+      // Ensure it's closed even on error
+      setQuotationToDelete(null);
+    }
+  };
+
+  const handleResetStatus = async (q: Quotation) => {
+    try {
+      const { error } = await supabase.from('quotations').update({ status: 'sent' }).eq('id', q.id);
+      if (error) throw error;
+      showAlert("Estado Reiniciado", "La cotización ha vuelto a estado 'Enviada' y puede procesarse nuevamente.", "success");
+      fetchData();
+    } catch (err: any) {
+      showAlert("Error", "No se pudo reiniciar el estado: " + err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Cotizaciones</h1>
+          <p className="text-xs text-slate-500">Gestión de presupuestos y cierre de ventas</p>
+        </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-600 transition-all active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Generar Cotización</span>
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-16">N°</th>
+                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
+                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
+                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
+                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
+                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Opciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {quotations.map((q, index) => {
+                const correlative = 20100 + (quotations.length - index);
+                const customer = customers.find(c => c.id === q.customer_id);
+                
+                {/* Client Label Using Unified Logic */}
+                const { mainLabel, subLabel } = getCustomerLabels(customer, q.customer_name);
+
+                return (
+                  <tr key={q.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-[14px] text-slate-500 font-extrabold whitespace-nowrap">
+                      {correlative}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm text-slate-900 leading-tight">
+                          {mainLabel}
+                        </span>
+                        {subLabel && (
+                          <span className="text-[10px] text-slate-400 font-medium truncate max-w-[250px] mt-0.5">
+                            {subLabel}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-[11px] text-slate-500 font-medium">{new Date(q.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 font-black text-sm text-slate-800">{formatCurrency(q.total)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider",
+                          q.status === 'accepted' ? "bg-emerald-100 text-emerald-700" :
+                          q.status === 'rejected' ? "bg-red-100 text-red-700" :
+                          "bg-sky-100 text-sky-700"
+                        )}>
+                          {q.status}
+                        </span>
+                        {q.status === 'accepted' && (
+                          <button 
+                            onClick={() => handleResetStatus(q)}
+                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
+                            title="Forzar Reinicio a Enviada"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  <td className="px-4 py-3 text-right space-x-1">
+                    <button 
+                      onClick={() => generatePDF(q, correlative)}
+                      className="p-1.5 text-blue-500 hover:bg-sky-50 hover:text-sky-600 rounded transition-colors"
+                      title="Descargar PDF"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => sendWhatsApp(q)}
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded"
+                      title="Enviar por WhatsApp"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                    {q.status !== 'accepted' && (
+                      <>
+                        <button 
+                          onClick={() => handleAcceptQuote(q)}
+                          className="p-1.5 text-sky-600 hover:bg-sky-50 rounded"
+                          title="Confirmar Venta"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditQuotation(q)}
+                          className="p-1.5 text-slate-600 hover:bg-slate-100 rounded"
+                          title="Editar Cotización"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                    <button 
+                      onClick={() => setQuotationToDelete(q.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all active:scale-90"
+                      title="Eliminar Permanente"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              )})}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* New Quote Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {editingQuotationId ? 'Editar Cotización' : 'Nueva Cotización'}
+                </h2>
+                <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="p-2 hover:bg-gray-100 rounded-full">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Side: selection */}
+                <div className="space-y-6">
+                  <section>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">1. Cliente Solicitante</h3>
+                    </div>
+                    
+                    {!selectedCustomer ? (
+                      <button 
+                        onClick={() => setIsCustomerPickerOpen(true)}
+                        className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-3xl hover:border-sky-400 hover:bg-sky-50 transition-all group"
+                      >
+                        <div className="bg-sky-100 p-3 rounded-full text-sky-600 mb-3 group-hover:scale-110 transition-transform">
+                          <UserPlus className="w-6 h-6" />
+                        </div>
+                        <p className="font-bold text-slate-800 text-sm">Seleccionar Cliente</p>
+                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Obligatorio para continuar</p>
+                      </button>
+                    ) : (
+                      <div className="bg-slate-900 p-4 rounded-2xl shadow-xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                          <UserPlus className="w-20 h-20 text-white" />
+                        </div>
+                        <div className="relative z-10 flex justify-between items-start">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Cliente Seleccionado</p>
+                            {/* Use label logic in selection summary too */}
+                            {(() => {
+                              const labels = getCustomerLabels(selectedCustomer);
+                              return (
+                                <>
+                                  <h4 className="text-white font-bold text-lg leading-tight">{labels.mainLabel}</h4>
+                                  <p className="text-slate-400 text-xs font-medium mt-1">{labels.subLabel}</p>
+                                </>
+                              );
+                            })()}
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3">
+                              <div>
+                                <p className="text-[8px] text-slate-500 font-black uppercase">Email</p>
+                                <p className="text-slate-300 text-[10px] truncate">{selectedCustomer.email || 'Sin registro'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-slate-500 font-black uppercase">Teléfono</p>
+                                <p className="text-slate-300 text-[10px]">{selectedCustomer.phone || 'Sin registro'}</p>
+                              </div>
+                              <div className="col-span-2">
+                                <p className="text-[8px] text-slate-500 font-black uppercase">Dirección</p>
+                                <p className="text-slate-300 text-[10px] truncate">{selectedCustomer.address || 'Sin dirección registrada'}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                             <button 
+                              onClick={() => {
+                                setEditingCustomer(selectedCustomer);
+                                setIsCustomerModalOpen(true);
+                              }}
+                              className="p-1 px-2 text-[9px] bg-white/10 text-white border border-white/20 rounded uppercase font-bold hover:bg-white/20 transition-all"
+                            >
+                              Editar Ficha
+                            </button>
+                            <button 
+                              onClick={() => setSelectedCustomer(null)}
+                              className="p-1 px-2 text-[9px] bg-red-500/20 text-red-300 border border-red-500/30 rounded uppercase font-bold hover:bg-red-500/40 transition-all"
+                            >
+                              Cambiar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <section>
+                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">2. Agregar Productos</h3>
+                     <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input 
+                          type="text" 
+                          placeholder="Buscar producto por nombre o SKU..."
+                          value={searchProduct}
+                          onChange={(e) => setSearchProduct(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
+                        />
+                     </div>
+                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                        {products
+                          .filter(p => !searchProduct || 
+                            (p.name || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1 || 
+                            (p.sku || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1
+                          )
+                          .slice(0, 30) // Limit display for performance
+                          .map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => handleAddItem(p)}
+                            className="w-full flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all group"
+                          >
+                            <div className="text-left flex-1 min-w-0">
+                              <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
+                              <p className="text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{p.sku} • {formatCurrency(p.price)}</p>
+                            </div>
+                            <div className="bg-slate-50 p-2 rounded-lg group-hover:bg-sky-600 group-hover:text-white transition-all text-slate-400">
+                              <Plus className="w-4 h-4" />
+                            </div>
+                          </button>
+                        ))}
+                        {searchProduct && products.filter(p => (p.name || '').toLowerCase().includes(searchProduct.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchProduct.toLowerCase())).length === 0 && (
+                          <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                             <p className="text-xs text-slate-400">No se encontraron productos con "{searchProduct}"</p>
+                          </div>
+                        )}
+                        {!searchProduct && products.length === 0 && (
+                           <p className="text-xs text-slate-400 text-center py-4 italic">Cargando catálogo...</p>
+                        )}
+                     </div>
+                  </section>
+                </div>
+
+                {/* Right Side: Cart */}
+                <div className="bg-slate-50 rounded-3xl p-6 flex flex-col">
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Resumen de Cotización</h3>
+                  <div className="flex-1 space-y-3 mb-6 overflow-y-auto">
+                    {quoteItems.length === 0 && (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
+                        <ShoppingCart className="w-10 h-10 opacity-20" />
+                        <p className="text-sm">No hay productos agregados</p>
+                      </div>
+                    )}
+                    {quoteItems.map(item => (
+                      <div key={item.productId} className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-gray-50 group">
+                        <div className="flex-1 min-w-0 mr-4">
+                          <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <button 
+                              onClick={() => updateItemQty(item.productId, -1)}
+                              className="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="text-xs font-black text-slate-700 w-5 text-center">{item.qty}</span>
+                            <button 
+                               onClick={() => updateItemQty(item.productId, 1)}
+                               className="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                            <span className="text-[10px] text-gray-400 ml-1">x {formatCurrency(item.price)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-slate-900 text-sm">{formatCurrency(item.subtotal)}</span>
+                          <button onClick={() => handleRemoveItem(item.productId)} className="text-slate-200 hover:text-red-500 p-1 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center text-lg font-extrabold text-slate-900 px-2">
+                      <span>Total</span>
+                      <span>{formatCurrency(total)}</span>
+                    </div>
+                    <button
+                      onClick={handleSaveQuotation}
+                      disabled={!selectedCustomer || quoteItems.length === 0}
+                      className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl shadow-slate-200 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
+                    >
+                      Generar y Guardar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Customer Modal (Nested in Quotation) */}
+      <AnimatePresence>
+        {isCustomerModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden border border-slate-200"
+            >
+              <div className="p-6 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6 px-1">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">
+                      {editingCustomer ? 'Editar' : 'Nuevo'} Cliente
+                    </h2>
+                  </div>
+                  <button onClick={() => { setIsCustomerModalOpen(false); setEditingCustomer(null); }} className="p-2 text-slate-400 hover:text-slate-600 rounded-full transition-all">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <form onSubmit={handleSaveCustomer} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre Completo</label>
+                        <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT Chileno o Código</label>
+                        <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono Móvil</label>
+                        <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+56 9 1234 5678" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
+                        <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                      </div>
+                    </div>
+                    
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
+                        <input 
+                          name="address" 
+                          defaultValue={editingCustomer?.address} 
+                          placeholder="Calle, Número, Departamento, Comuna"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
+                        />
+                      </div>
+                    </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button 
+                      type="button" 
+                      onClick={() => { setIsCustomerModalOpen(false); setEditingCustomer(null); }}
+                      className="flex-1 px-4 py-2 text-slate-500 text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all border border-transparent"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-3 bg-slate-900 text-white py-2.5 rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 active:scale-95 transition-all"
+                    >
+                      {editingCustomer ? 'Actualizar Ficha' : 'Registrar Cliente'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Customer Selection Modal */}
+      <AnimatePresence>
+        {isCustomerPickerOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]"
+            >
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                   <h2 className="text-xl font-black text-slate-800 tracking-tight">Seleccionar Cliente</h2>
+                   <p className="text-xs text-slate-500 font-medium tracking-wide">Busque un cliente registrado o cree uno nuevo</p>
+                </div>
+                <button onClick={() => setIsCustomerPickerOpen(false)} className="p-3 hover:bg-slate-200/50 text-slate-400 rounded-full transition-all">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="p-8 flex-1 overflow-y-auto">
+                <div className="flex gap-2 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <input 
+                      type="text"
+                      placeholder="Buscar por Nombre, RUT o Email..."
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none font-medium text-slate-600 placeholder:text-slate-300 transition-all shadow-inner"
+                      value={searchCustomer}
+                      onChange={(e) => setSearchCustomer(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setEditingCustomer(null);
+                      setIsCustomerModalOpen(true);
+                    }}
+                    className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg hover:bg-sky-700 active:scale-95 transition-all"
+                  >
+                    <UserPlus className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {customers
+                    .filter(c => 
+                      !searchCustomer || 
+                      (c.name?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) || 
+                      (c.rut?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) ||
+                      (c.email?.toLowerCase() || '').includes(searchCustomer.toLowerCase())
+                    )
+                    .slice(0, 50)
+                    .map(c => {
+                      const { mainLabel, subLabel } = getCustomerLabels(c);
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedCustomer(c);
+                            setIsCustomerPickerOpen(false);
+                          }}
+                          className="w-full group hover:bg-slate-50 p-4 border border-slate-50 hover:border-slate-200 rounded-2xl transition-all text-left flex items-center justify-between"
+                        >
+                           <div className="flex items-center gap-4">
+                             <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-sm group-hover:bg-sky-100 group-hover:text-sky-600 transition-colors">
+                               {mainLabel.charAt(0)}
+                             </div>
+                             <div>
+                                <p className="font-bold text-slate-800 text-sm">{mainLabel}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{subLabel}</p>
+                             </div>
+                           </div>
+                           <ChevronRight className="w-5 h-5 text-slate-200 group-hover:text-slate-400 group-hover:translate-x-1 transition-all" />
+                        </button>
+                      )})}
+                  
+                  {customers.filter(c => 
+                    !searchCustomer || 
+                    (c.name?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) || 
+                    (c.rut?.toLowerCase() || '').includes(searchCustomer.toLowerCase())
+                  ).length === 0 && (
+                    <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                       <UserPlus className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                       <p className="text-sm font-bold text-slate-400">No se encontraron clientes coincidentes</p>
+                       <p className="text-[10px] text-slate-300 uppercase tracking-widest mt-1">Intente con otros términos o cree uno nuevo</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Global Alert Modal */}
+      <AnimatePresence>
+        {alertConfig && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-slate-200 text-center p-8"
+            >
+              <div className={cn(
+                "w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center",
+                alertConfig.type === 'success' ? "bg-emerald-100 text-emerald-600" : 
+                alertConfig.type === 'warning' ? "bg-amber-100 text-amber-600" :
+                "bg-red-100 text-red-600"
+              )}>
+                {alertConfig.type === 'success' ? <CheckCircle2 className="w-8 h-8" /> : 
+                 alertConfig.type === 'warning' ? <AlertCircle className="w-8 h-8" /> :
+                 <X className="w-8 h-8" />}
+              </div>
+              
+              <h3 className="text-lg font-black text-slate-800 mb-2">{alertConfig.title}</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed mb-6">
+                {alertConfig.message}
+              </p>
+              
+              <button 
+                onClick={() => setAlertConfig(null)}
+                className={cn(
+                  "w-full py-3 rounded-xl font-bold transition-all active:scale-95 text-white shadow-lg",
+                  alertConfig.type === 'success' ? "bg-emerald-600 shadow-emerald-200" : 
+                  alertConfig.type === 'warning' ? "bg-amber-600 shadow-amber-200" :
+                  "bg-slate-900 shadow-slate-200"
+                )}
+              >
+                Entendido
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {quotationToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden text-center p-8"
+            >
+              <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full mx-auto mb-6 flex items-center justify-center">
+                <Trash2 className="w-10 h-10" />
+              </div>
+              
+              <h3 className="text-xl font-black text-slate-900 mb-2">¿Eliminar Cotización?</h3>
+              <p className="text-sm text-slate-500 mb-8 px-2">
+                Esta acción es permanente y no se puede deshacer. Los registros asociados podrían verse afectados.
+              </p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setQuotationToDelete(null)}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDeleteQuotation}
+                  disabled={isDeleting}
+                  className="flex-1 py-3 px-4 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? 'Borrando...' : 'Sí, Borrar'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+
+  );
+}
