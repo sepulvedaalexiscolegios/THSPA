@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plus, Search, FileText, Send, ShoppingCart, Trash2, X, ChevronRight, UserPlus, Edit2, Minus, AlertCircle, CheckCircle2, Printer } from 'lucide-react';
-import { Quotation, Customer, Product, QuotationItem } from '../types';
+import { Quotation, Customer, Product, QuotationItem, Category, Subcategory } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import React from 'react';
@@ -20,9 +20,12 @@ export function QuotationView() {
   const [quoteItems, setQuoteItems] = useState<QuotationItem[]>([]);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   
   // Customer Modal State (within Quotation)
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
@@ -41,35 +44,39 @@ export function QuotationView() {
     const qChannel = supabase.channel('quotations_all').on('postgres_changes', { event: '*', schema: 'public', table: 'quotations' }, () => fetchData()).subscribe();
     const cChannel = supabase.channel('customers_all').on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => fetchData()).subscribe();
     const pChannel = supabase.channel('products_all').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchData()).subscribe();
+    const catChannel = supabase.channel('categories_all').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchData()).subscribe();
+    const subChannel = supabase.channel('subcategories_all').on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => fetchData()).subscribe();
 
     return () => {
       supabase.removeChannel(qChannel);
       supabase.removeChannel(cChannel);
       supabase.removeChannel(pChannel);
+      supabase.removeChannel(catChannel);
+      supabase.removeChannel(subChannel);
     };
   }, []);
 
   const fetchData = async () => {
     try {
-      const [qRes, cRes, pRes] = await Promise.all([
+      const [qRes, cRes, pRes, catRes, subRes] = await Promise.all([
         supabase.from('quotations').select('*').order('date', { ascending: false }),
         supabase.from('customers').select('*').order('name'),
-        supabase.from('products').select('*').order('name')
+        supabase.from('products').select('*').order('name'),
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('subcategories').select('*').order('name')
       ]);
 
       if (qRes.error) throw qRes.error;
       if (cRes.error) throw cRes.error;
       if (pRes.error) throw pRes.error;
-
-      console.log('Quotation Data Loaded:', {
-        quotes: qRes.data?.length,
-        customers: cRes.data?.length,
-        products: pRes.data?.length
-      });
+      if (catRes.error) throw catRes.error;
+      if (subRes.error) throw subRes.error;
 
       if (qRes.data) setQuotations(qRes.data);
       if (cRes.data) setCustomers(cRes.data);
       if (pRes.data) setProducts(pRes.data);
+      if (catRes.data) setCategories(catRes.data);
+      if (subRes.data) setSubcategories(subRes.data);
     } catch (err: any) {
       console.error('Error fetching quotation data:', err);
     }
@@ -186,6 +193,38 @@ export function QuotationView() {
     } catch (err: any) {
       console.error('Save Quotation Error:', err);
       showAlert("Error Crítico", 'No se pudo guardar la cotización: ' + (err.message || 'Error desconocido'));
+    }
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const productData = {
+      name: formData.get('name') as string,
+      sku: formData.get('sku') as string,
+      category: formData.get('category') as string,
+      subcategory: formData.get('subcategory') as string,
+      price: Number(formData.get('price')),
+      cost_price: Number(formData.get('costPrice')),
+      stock: Number(formData.get('stock')),
+      min_stock: Number(formData.get('minStock')),
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([productData])
+        .select();
+
+      if (error) throw error;
+      
+      const newProduct = data[0] as Product;
+      setProducts(prev => [newProduct, ...prev]);
+      setIsProductModalOpen(false);
+      setSearchProduct(newProduct.sku);
+    } catch (error) {
+      console.error('Error saving product:', error);
+      alert('Error al guardar el producto');
     }
   };
 
@@ -768,7 +807,16 @@ export function QuotationView() {
                   </section>
 
                   <section>
-                     <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">2. Productos</h3>
+                    <div className="flex items-center justify-between mb-3 md:mb-4">
+                      <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">2. Productos</h3>
+                      <button 
+                        onClick={() => setIsProductModalOpen(true)}
+                        className="flex items-center gap-1.5 text-sky-600 hover:text-sky-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span className="text-[10px] md:text-xs font-bold uppercase">Nuevo</span>
+                      </button>
+                    </div>
                      <div className="relative mb-3 md:mb-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input 
@@ -806,13 +854,13 @@ export function QuotationView() {
                 </div>
 
                 {/* Right Side: Cart */}
-                <div className="bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col">
-                  <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
+                <div className="bg-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col">
+                  <h3 className="text-[10px] md:text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
                   <div className="flex-1 space-y-2 md:space-y-3 mb-4 md:mb-6 overflow-y-auto">
                     {quoteItems.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-300 space-y-2 py-8">
-                        <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 opacity-20" />
-                        <p className="text-xs md:text-sm">Sin productos</p>
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2 py-8">
+                        <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 opacity-30" />
+                        <p className="text-xs md:text-sm">Sin productos seleccionados</p>
                       </div>
                     )}
                     {quoteItems.map(item => (
@@ -846,7 +894,7 @@ export function QuotationView() {
                     ))}
                   </div>
 
-                  <div className="space-y-3 md:space-y-4 pt-3 md:pt-4 border-t border-gray-200">
+                  <div className="space-y-3 md:space-y-4 pt-3 md:pt-4 border-t border-slate-200">
                     <div className="flex justify-between items-center text-base md:text-lg font-extrabold text-slate-900 px-1 md:px-2">
                       <span>Total</span>
                       <span>{formatCurrency(total)}</span>
@@ -947,6 +995,100 @@ export function QuotationView() {
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* Add Product Modal */}
+        <AnimatePresence>
+          {isProductModalOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+              >
+                <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <h2 className="text-lg md:text-xl font-bold text-slate-900">Crear Nuevo Producto</h2>
+                  <button onClick={() => setIsProductModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <form onSubmit={handleSaveProduct} className="p-4 md:p-6 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre del Producto</label>
+                      <input name="name" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">SKU / Código</label>
+                      <input name="sku" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Actual</label>
+                      <input name="stock" type="number" defaultValue="0" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Categoría</label>
+                      <select 
+                        name="category" 
+                        required
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                      >
+                        <option value="">Seleccionar</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Subcategoría</label>
+                      <select 
+                        name="subcategory" 
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                      >
+                        <option value="">Otras</option>
+                        {subcategories.map(sub => (
+                          <option key={sub.id} value={sub.name}>{sub.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Costo</label>
+                      <input name="costPrice" type="number" defaultValue="0" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
+                      <input name="price" type="number" required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div className="hidden">
+                      <input name="minStock" type="hidden" value="0" />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsProductModalOpen(false)}
+                      className="flex-1 px-4 py-3 md:py-2 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-[2] bg-slate-900 text-white py-3.5 md:py-2.5 rounded-xl md:rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 active:scale-95 transition-all uppercase"
+                    >
+                      Guardar Producto
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       {/* Customer Selection Modal */}
       <AnimatePresence>

@@ -11,6 +11,7 @@ import React from 'react';
 
 export function SalesView() {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transports, setTransports] = useState<Transport[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -43,9 +44,7 @@ export function SalesView() {
       ]);
       
       if (sRes.data) setSales(sRes.data);
-      if (qRes.data) {
-        // We'll use this to find the quotation number
-      }
+      if (qRes.data) setQuotations(qRes.data);
       if (cRes.data) setCustomers(cRes.data);
       if (tRes.data) setTransports(tRes.data);
     } catch (error) {
@@ -399,9 +398,10 @@ export function SalesView() {
         </div>
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left min-w-[700px]">
-             <thead>
+            <thead>
               <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                <th className="px-4 py-4">ID / Fecha</th>
+                <th className="px-4 py-4">Referencia</th>
+                <th className="px-4 py-4">Fecha</th>
                 <th className="px-4 py-4">Cliente</th>
                 <th className="px-4 py-4">Monto Total</th>
                 <th className="px-4 py-4">Carga</th>
@@ -411,10 +411,30 @@ export function SalesView() {
             <tbody className="divide-y divide-slate-50">
               {monthlySales.map((s) => {
                 const customer = customers.find(c => c.id === s.customer_id);
+                
+                // Numeric Correlatives
+                const qIdx = quotations.findIndex(q => q.id === s.quotation_id);
+                const qNumber = qIdx !== -1 ? 20100 + (quotations.length - qIdx) : null;
+                
+                const sIdx = sales.findIndex(x => x.id === s.id);
+                const sNumber = sIdx !== -1 ? 5000 + (sales.length - sIdx) : null;
+
                 return (
                   <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-4">
-                      <div className="text-[11px] md:text-[12px] font-black text-slate-800 uppercase">{format(new Date(s.date), 'dd MMM, HH:mm', { locale: es })}</div>
+                      {qNumber && (
+                        <div className="text-sm font-black text-slate-900 leading-none">
+                          COTIZ-{qNumber}
+                        </div>
+                      )}
+                      {sNumber && (
+                        <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">
+                          Venta #{sNumber}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="text-[11px] md:text-[12px] font-bold text-slate-600 uppercase">{format(new Date(s.date), 'dd MMM, HH:mm', { locale: es })}</div>
                     </td>
                     <td className="px-4 py-4">
                       {(() => {
