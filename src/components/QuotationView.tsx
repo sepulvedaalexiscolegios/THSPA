@@ -561,14 +561,14 @@ export function QuotationView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Cotizaciones</h1>
-          <p className="text-xs text-slate-500">Gestión de presupuestos y cierre de ventas</p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Cotizaciones</h1>
+          <p className="text-[10px] md:text-xs text-slate-500">Gestión de presupuestos y cierre de ventas</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-sky-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-600 transition-all active:scale-95"
+          className="flex items-center justify-center gap-2 bg-sky-500 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-600 transition-all active:scale-95 w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Generar Cotización</span>
@@ -576,16 +576,16 @@ export function QuotationView() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left min-w-[700px]">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-16">N°</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Opciones</th>
+                <th className="px-3 md:px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-16 text-center">N°</th>
+                <th className="px-3 md:px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cliente</th>
+                <th className="px-3 md:px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Fecha</th>
+                <th className="px-3 md:px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
+                <th className="px-3 md:px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Estado</th>
+                <th className="px-3 md:px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Opciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -593,32 +593,31 @@ export function QuotationView() {
                 const correlative = 20100 + (quotations.length - index);
                 const customer = customers.find(c => c.id === q.customer_id);
                 
-                {/* Client Label Using Unified Logic */}
                 const { mainLabel, subLabel } = getCustomerLabels(customer, q.customer_name);
 
                 return (
                   <tr key={q.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-[14px] text-slate-500 font-extrabold whitespace-nowrap">
+                    <td className="px-3 md:px-4 py-4 font-mono text-[13px] md:text-[14px] text-slate-500 font-extrabold whitespace-nowrap text-center">
                       {correlative}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 md:px-4 py-4 min-w-[150px]">
                       <div className="flex flex-col">
-                        <span className="font-bold text-sm text-slate-900 leading-tight">
+                        <span className="font-bold text-xs md:text-sm text-slate-900 leading-tight">
                           {mainLabel}
                         </span>
                         {subLabel && (
-                          <span className="text-[10px] text-slate-400 font-medium truncate max-w-[250px] mt-0.5">
+                          <span className="text-[9px] md:text-[10px] text-slate-400 font-medium truncate max-w-[200px] mt-0.5">
                             {subLabel}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[11px] text-slate-500 font-medium">{new Date(q.date).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 font-black text-sm text-slate-800">{formatCurrency(q.total)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 md:px-4 py-4 text-[10px] md:text-[11px] text-slate-500 font-medium whitespace-nowrap text-center">{new Date(q.date).toLocaleDateString()}</td>
+                    <td className="px-3 md:px-4 py-4 font-black text-xs md:text-sm text-slate-800 whitespace-nowrap">{formatCurrency(q.total)}</td>
+                    <td className="px-3 md:px-4 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <span className={cn(
-                          "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider",
+                          "px-2 py-0.5 rounded text-[8px] md:text-[9px] font-black uppercase tracking-wider",
                           q.status === 'accepted' ? "bg-emerald-100 text-emerald-700" :
                           q.status === 'rejected' ? "bg-red-100 text-red-700" :
                           "bg-sky-100 text-sky-700"
@@ -636,49 +635,51 @@ export function QuotationView() {
                         )}
                       </div>
                     </td>
-                  <td className="px-4 py-3 text-right space-x-1">
-                    <button 
-                      onClick={() => generatePDF(q, correlative)}
-                      className="p-1.5 text-blue-500 hover:bg-sky-50 hover:text-sky-600 rounded transition-colors"
-                      title="Descargar PDF"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => sendWhatsApp(q)}
-                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded"
-                      title="Enviar por WhatsApp"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
-                    {q.status !== 'accepted' && (
-                      <>
+                    <td className="px-3 md:px-4 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5 md:gap-1">
                         <button 
-                          onClick={() => handleAcceptQuote(q)}
-                          className="p-1.5 text-sky-600 hover:bg-sky-50 rounded"
-                          title="Confirmar Venta"
+                          onClick={() => generatePDF(q, correlative)}
+                          className="p-2 md:p-1.5 text-blue-500 hover:bg-sky-50 hover:text-sky-600 rounded-lg transition-colors border border-slate-100 md:border-transparent"
+                          title="Descargar PDF"
                         >
-                          <ShoppingCart className="w-4 h-4" />
+                          <Printer className="w-4 h-4 md:w-4 md:h-4" />
                         </button>
                         <button 
-                          onClick={() => handleEditQuotation(q)}
-                          className="p-1.5 text-slate-600 hover:bg-slate-100 rounded"
-                          title="Editar Cotización"
+                          onClick={() => sendWhatsApp(q)}
+                          className="p-2 md:p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg border border-slate-100 md:border-transparent"
+                          title="Enviar por WhatsApp"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Send className="w-4 h-4 md:w-4 md:h-4" />
                         </button>
-                      </>
-                    )}
-                    <button 
-                      onClick={() => setQuotationToDelete(q.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all active:scale-90"
-                      title="Eliminar Permanente"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              )})}
+                        {q.status !== 'accepted' && (
+                          <>
+                            <button 
+                              onClick={() => handleAcceptQuote(q)}
+                              className="p-2 md:p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg border border-slate-100 md:border-transparent"
+                              title="Confirmar Venta"
+                            >
+                              <ShoppingCart className="w-4 h-4 md:w-4 md:h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleEditQuotation(q)}
+                              className="p-2 md:p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-100 md:border-transparent"
+                              title="Editar Cotización"
+                            >
+                              <Edit2 className="w-4 h-4 md:w-4 md:h-4" />
+                            </button>
+                          </>
+                        )}
+                        <button 
+                          onClick={() => setQuotationToDelete(q.id)}
+                          className="p-2 md:p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all active:scale-90 border border-slate-100 md:border-transparent"
+                          title="Eliminar Permanente"
+                        >
+                          <Trash2 className="w-4 h-4 md:w-4 md:h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )})}
             </tbody>
           </table>
         </div>
@@ -691,87 +692,72 @@ export function QuotationView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]"
             >
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-2xl font-bold text-slate-900">
+              <div className="p-4 md:p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
+                <h2 className="text-lg md:text-2xl font-bold text-slate-900">
                   {editingQuotationId ? 'Editar Cotización' : 'Nueva Cotización'}
                 </h2>
                 <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="p-2 hover:bg-gray-100 rounded-full">
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 {/* Left Side: selection */}
-                <div className="space-y-6">
+                <div className="space-y-5 md:space-y-6">
                   <section>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">1. Cliente Solicitante</h3>
+                    <div className="flex items-center justify-between mb-3 md:mb-4">
+                      <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">1. Cliente Solicitante</h3>
                     </div>
                     
                     {!selectedCustomer ? (
                       <button 
                         onClick={() => setIsCustomerPickerOpen(true)}
-                        className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-3xl hover:border-sky-400 hover:bg-sky-50 transition-all group"
+                        className="w-full flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed border-slate-200 rounded-2xl md:rounded-3xl hover:border-sky-400 hover:bg-sky-50 transition-all group"
                       >
-                        <div className="bg-sky-100 p-3 rounded-full text-sky-600 mb-3 group-hover:scale-110 transition-transform">
-                          <UserPlus className="w-6 h-6" />
+                        <div className="bg-sky-100 p-2.5 md:p-3 rounded-full text-sky-600 mb-2 md:mb-3 group-hover:scale-110 transition-transform">
+                          <UserPlus className="w-5 h-5 md:w-6 md:h-6" />
                         </div>
-                        <p className="font-bold text-slate-800 text-sm">Seleccionar Cliente</p>
-                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Obligatorio para continuar</p>
+                        <p className="font-bold text-slate-800 text-xs md:text-sm">Seleccionar Cliente</p>
+                        <p className="text-[9px] md:text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Obligatorio</p>
                       </button>
                     ) : (
-                      <div className="bg-slate-900 p-4 rounded-2xl shadow-xl relative overflow-hidden group">
+                      <div className="bg-slate-900 p-4 rounded-xl md:rounded-2xl shadow-xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-4 opacity-10">
-                          <UserPlus className="w-20 h-20 text-white" />
+                          <UserPlus className="w-16 h-16 md:w-20 md:h-20 text-white" />
                         </div>
                         <div className="relative z-10 flex justify-between items-start">
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Cliente Seleccionado</p>
-                            {/* Use label logic in selection summary too */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[9px] md:text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Seleccionado</p>
                             {(() => {
                               const labels = getCustomerLabels(selectedCustomer);
                               return (
                                 <>
-                                  <h4 className="text-white font-bold text-lg leading-tight">{labels.mainLabel}</h4>
-                                  <p className="text-slate-400 text-xs font-medium mt-1">{labels.subLabel}</p>
+                                  <h4 className="text-white font-bold text-base md:text-lg leading-tight truncate">{labels.mainLabel}</h4>
+                                  <p className="text-slate-400 text-[10px] md:text-xs font-medium mt-0.5 truncate">{labels.subLabel}</p>
                                 </>
                               );
                             })()}
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3">
-                              <div>
-                                <p className="text-[8px] text-slate-500 font-black uppercase">Email</p>
-                                <p className="text-slate-300 text-[10px] truncate">{selectedCustomer.email || 'Sin registro'}</p>
-                              </div>
-                              <div>
-                                <p className="text-[8px] text-slate-500 font-black uppercase">Teléfono</p>
-                                <p className="text-slate-300 text-[10px]">{selectedCustomer.phone || 'Sin registro'}</p>
-                              </div>
-                              <div className="col-span-2">
-                                <p className="text-[8px] text-slate-500 font-black uppercase">Dirección</p>
-                                <p className="text-slate-300 text-[10px] truncate">{selectedCustomer.address || 'Sin dirección registrada'}</p>
-                              </div>
-                            </div>
                           </div>
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-1.5 ml-2">
                              <button 
                               onClick={() => {
                                 setEditingCustomer(selectedCustomer);
                                 setIsCustomerModalOpen(true);
                               }}
-                              className="p-1 px-2 text-[9px] bg-white/10 text-white border border-white/20 rounded uppercase font-bold hover:bg-white/20 transition-all"
+                              className="p-1 px-2 text-[8px] md:text-[9px] bg-white/10 text-white border border-white/20 rounded uppercase font-bold hover:bg-white/20 transition-all"
                             >
-                              Editar Ficha
+                              Editar
                             </button>
                             <button 
                               onClick={() => setSelectedCustomer(null)}
-                              className="p-1 px-2 text-[9px] bg-red-500/20 text-red-300 border border-red-500/30 rounded uppercase font-bold hover:bg-red-500/40 transition-all"
+                              className="p-1 px-2 text-[8px] md:text-[9px] bg-red-500/20 text-red-300 border border-red-500/30 rounded uppercase font-bold hover:bg-red-500/40 transition-all"
                             >
                               Cambiar
                             </button>
@@ -782,101 +768,93 @@ export function QuotationView() {
                   </section>
 
                   <section>
-                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">2. Agregar Productos</h3>
-                     <div className="relative mb-4">
+                     <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">2. Productos</h3>
+                     <div className="relative mb-3 md:mb-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input 
                           type="text" 
-                          placeholder="Buscar producto por nombre o SKU..."
+                          placeholder="Buscar SKU o Nombre..."
                           value={searchProduct}
                           onChange={(e) => setSearchProduct(e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
+                          className="w-full pl-10 pr-4 py-2.5 md:py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs md:text-sm focus:ring-2 focus:ring-slate-900 outline-none"
                         />
                      </div>
-                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                     <div className="space-y-2 max-h-48 md:max-h-60 overflow-y-auto pr-1 md:pr-2 custom-scrollbar">
                         {products
                           .filter(p => !searchProduct || 
                             (p.name || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1 || 
                             (p.sku || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1
                           )
-                          .slice(0, 30) // Limit display for performance
+                          .slice(0, 30)
                           .map(p => (
                           <button
                             key={p.id}
                             onClick={() => handleAddItem(p)}
-                            className="w-full flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all group"
+                            className="w-full flex items-center justify-between p-2.5 md:p-3 bg-white border border-gray-100 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all group"
                           >
-                            <div className="text-left flex-1 min-w-0">
-                              <p className="font-bold text-slate-900 text-sm truncate">{p.name}</p>
-                              <p className="text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{p.sku} • {formatCurrency(p.price)}</p>
+                            <div className="text-left flex-1 min-w-0 mr-2">
+                              <p className="font-bold text-slate-900 text-xs md:text-sm truncate">{p.name}</p>
+                              <p className="text-[9px] md:text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{p.sku} • {formatCurrency(p.price)}</p>
                             </div>
-                            <div className="bg-slate-50 p-2 rounded-lg group-hover:bg-sky-600 group-hover:text-white transition-all text-slate-400">
-                              <Plus className="w-4 h-4" />
+                            <div className="bg-slate-50 p-1.5 md:p-2 rounded-lg group-hover:bg-sky-600 group-hover:text-white transition-all text-slate-400">
+                              <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                             </div>
                           </button>
                         ))}
-                        {searchProduct && products.filter(p => (p.name || '').toLowerCase().includes(searchProduct.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchProduct.toLowerCase())).length === 0 && (
-                          <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                             <p className="text-xs text-slate-400">No se encontraron productos con "{searchProduct}"</p>
-                          </div>
-                        )}
-                        {!searchProduct && products.length === 0 && (
-                           <p className="text-xs text-slate-400 text-center py-4 italic">Cargando catálogo...</p>
-                        )}
                      </div>
                   </section>
                 </div>
 
                 {/* Right Side: Cart */}
-                <div className="bg-slate-50 rounded-3xl p-6 flex flex-col">
-                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Resumen de Cotización</h3>
-                  <div className="flex-1 space-y-3 mb-6 overflow-y-auto">
+                <div className="bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col">
+                  <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
+                  <div className="flex-1 space-y-2 md:space-y-3 mb-4 md:mb-6 overflow-y-auto">
                     {quoteItems.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
-                        <ShoppingCart className="w-10 h-10 opacity-20" />
-                        <p className="text-sm">No hay productos agregados</p>
+                      <div className="h-full flex flex-col items-center justify-center text-gray-300 space-y-2 py-8">
+                        <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 opacity-20" />
+                        <p className="text-xs md:text-sm">Sin productos</p>
                       </div>
                     )}
                     {quoteItems.map(item => (
-                      <div key={item.productId} className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-gray-50 group">
-                        <div className="flex-1 min-w-0 mr-4">
-                          <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
+                      <div key={item.productId} className="flex items-center justify-between bg-white p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm border border-gray-50 group">
+                        <div className="flex-1 min-w-0 mr-2 md:mr-4">
+                          <p className="font-bold text-slate-900 text-[11px] md:text-sm truncate leading-none uppercase">{item.name}</p>
+                          <div className="flex items-center gap-1.5 md:gap-2 mt-1 md:mt-0.5">
                             <button 
                               onClick={() => updateItemQty(item.productId, -1)}
-                              className="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
+                              className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-2.5 h-2.5 md:w-3 md:h-3" />
                             </button>
-                            <span className="text-xs font-black text-slate-700 w-5 text-center">{item.qty}</span>
+                            <span className="text-[10px] md:text-xs font-black text-slate-700 w-4 md:w-5 text-center">{item.qty}</span>
                             <button 
                                onClick={() => updateItemQty(item.productId, 1)}
-                               className="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
+                               className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-2.5 h-2.5 md:w-3 md:h-3" />
                             </button>
-                            <span className="text-[10px] text-gray-400 ml-1">x {formatCurrency(item.price)}</span>
+                            <span className="text-[9px] md:text-[10px] text-gray-400 ml-1">x {formatCurrency(item.price)}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-slate-900 text-sm">{formatCurrency(item.subtotal)}</span>
+                        <div className="flex items-center gap-2 md:gap-3">
+                          <span className="font-bold text-slate-900 text-xs md:text-sm">{formatCurrency(item.subtotal)}</span>
                           <button onClick={() => handleRemoveItem(item.productId)} className="text-slate-200 hover:text-red-500 p-1 transition-colors">
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="space-y-4 pt-4 border-t border-gray-200">
-                    <div className="flex justify-between items-center text-lg font-extrabold text-slate-900 px-2">
+                  <div className="space-y-3 md:space-y-4 pt-3 md:pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center text-base md:text-lg font-extrabold text-slate-900 px-1 md:px-2">
                       <span>Total</span>
                       <span>{formatCurrency(total)}</span>
                     </div>
                     <button
                       onClick={handleSaveQuotation}
                       disabled={!selectedCustomer || quoteItems.length === 0}
-                      className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl shadow-slate-200 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
+                      className="w-full bg-slate-900 text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold shadow-xl shadow-slate-200 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
                     >
                       Generar y Guardar
                     </button>
@@ -895,7 +873,7 @@ export function QuotationView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
@@ -914,53 +892,53 @@ export function QuotationView() {
                   </button>
                 </div>
                 
-                <form onSubmit={handleSaveCustomer} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre Completo</label>
-                        <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT Chileno o Código</label>
-                        <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
+                <form onSubmit={handleSaveCustomer} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre Completo</label>
+                         <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT o Código</label>
+                         <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono Móvil</label>
-                        <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+56 9 1234 5678" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
-                        <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
+                    <div className="space-y-2">
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono</label>
+                         <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+569..." className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
+                         <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
                     </div>
                     
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
-                        <input 
-                          name="address" 
-                          defaultValue={editingCustomer?.address} 
-                          placeholder="Calle, Número, Departamento, Comuna"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
-                        />
-                      </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
+                      <input 
+                        name="address" 
+                        defaultValue={editingCustomer?.address} 
+                        placeholder="Calle, Número, Comuna"
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
+                      />
                     </div>
+                  </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex gap-2 pt-2">
                     <button 
                       type="button" 
                       onClick={() => { setIsCustomerModalOpen(false); setEditingCustomer(null); }}
-                      className="flex-1 px-4 py-2 text-slate-500 text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all border border-transparent"
+                      className="flex-1 px-4 py-3 md:py-2 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit" 
-                      className="flex-3 bg-slate-900 text-white py-2.5 rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 active:scale-95 transition-all"
+                      className="flex-[2] bg-slate-900 text-white py-3.5 md:py-2.5 rounded-xl md:rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 active:scale-95 transition-all uppercase"
                     >
-                      {editingCustomer ? 'Actualizar Ficha' : 'Registrar Cliente'}
+                      {editingCustomer ? 'Actualizar Ficha' : 'Guardar Cliente'}
                     </button>
                   </div>
                 </form>
@@ -977,7 +955,7 @@ export function QuotationView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -1122,7 +1100,7 @@ export function QuotationView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
+            className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}

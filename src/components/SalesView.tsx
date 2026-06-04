@@ -322,42 +322,42 @@ export function SalesView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Ventas y Reportes</h1>
-          <p className="text-xs text-slate-500">Análisis trimestral y operaciones de envío</p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Ventas y Reportes</h1>
+          <p className="text-[10px] md:text-xs text-slate-500">Análisis trimestral y operaciones de envío</p>
         </div>
         <div className="flex gap-2">
           <input 
             type="month" 
             value={format(selectedMonth, 'yyyy-MM')}
             onChange={(e) => setSelectedMonth(new Date(e.target.value + '-01'))}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-md text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
-          <button className="bg-slate-800 text-white p-2 rounded-md hover:bg-slate-900 transition-all">
+          <button className="bg-slate-800 text-white p-2.5 sm:p-2 rounded-lg sm:rounded-md hover:bg-slate-900 transition-all">
             <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Performance Card */}
-        <div className="bg-[#1E293B] text-white rounded-xl p-6 relative overflow-hidden shadow-lg border border-slate-700">
+        <div className="bg-[#1E293B] text-white rounded-2xl md:rounded-xl p-6 relative overflow-hidden shadow-lg border border-slate-700">
            <TrendingUp className="absolute -right-4 -bottom-4 w-32 h-32 opacity-10" />
            <div className="relative z-10 flex flex-col h-full justify-between">
              <div>
-               <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">Ventas {format(selectedMonth, 'MMMM yyyy', { locale: es })}</p>
-               <h2 className="text-3xl font-black mb-6">{formatCurrency(totalRevenue)}</h2>
+               <p className="text-slate-400 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mb-2">Ventas {format(selectedMonth, 'MMMM yyyy', { locale: es })}</p>
+               <h2 className="text-2xl md:text-3xl font-black mb-6">{formatCurrency(totalRevenue)}</h2>
              </div>
              
              <div className="grid grid-cols-2 gap-3 mt-auto">
-               <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                 <p className="text-[10px] text-slate-400 mb-1 font-bold">OPERACIONES</p>
-                 <p className="text-lg font-black">{monthlySales.length}</p>
+               <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                 <p className="text-[9px] md:text-[10px] text-slate-400 mb-1 font-bold italic">OPERACIONES</p>
+                 <p className="text-base md:text-lg font-black">{monthlySales.length}</p>
                </div>
-               <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                 <p className="text-[10px] text-slate-400 mb-1 font-bold">TICKET AVG</p>
-                 <p className="text-lg font-black">
+               <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                 <p className="text-[9px] md:text-[10px] text-slate-400 mb-1 font-bold italic">TICKET AVG</p>
+                 <p className="text-base md:text-lg font-black text-emerald-400">
                    {monthlySales.length > 0 ? formatCurrency(totalRevenue / monthlySales.length) : '$0'}
                  </p>
                </div>
@@ -366,22 +366,22 @@ export function SalesView() {
         </div>
 
         {/* Status Breakdown */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+        <div className="bg-white rounded-2xl md:rounded-xl border border-slate-200 p-6 shadow-sm">
+           <h3 className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
              <Filter className="w-4 h-4" /> Logística de Despachos
            </h3>
-           <div className="space-y-4">
+           <div className="space-y-5">
               {[
                 { label: 'Pendientes', count: monthlySales.filter(s => s.status === 'paid').length, color: 'bg-sky-500' },
                 { label: 'En Tránsito', count: monthlySales.filter(s => s.status === 'shipping').length, color: 'bg-amber-500' },
                 { label: 'Entregados', count: monthlySales.filter(s => s.status === 'delivered').length, color: 'bg-emerald-500' },
               ].map((item, idx) => (
-                <div key={idx} className="space-y-1">
+                <div key={idx} className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-600">{item.label}</span>
-                    <span className="text-[11px] font-black">{item.count}</span>
+                    <span className="text-[10px] md:text-[11px] font-bold text-slate-600 uppercase tracking-tight">{item.label}</span>
+                    <span className="text-[10px] md:text-[11px] font-black">{item.count}</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                     <div 
                       className={cn("h-full transition-all duration-500", item.color)} 
                       style={{ width: `${monthlySales.length > 0 ? (item.count / monthlySales.length) * 100 : 0}%` }} 
@@ -393,19 +393,19 @@ export function SalesView() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl md:rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Historial Operativo</h3>
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Historial Operativo</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left min-w-[700px]">
              <thead>
               <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                <th className="px-4 py-3">ID / Fecha</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Monto Total</th>
-                <th className="px-4 py-3">Carga</th>
-                <th className="px-4 py-3 text-right">Opciones</th>
+                <th className="px-4 py-4">ID / Fecha</th>
+                <th className="px-4 py-4">Cliente</th>
+                <th className="px-4 py-4">Monto Total</th>
+                <th className="px-4 py-4">Carga</th>
+                <th className="px-4 py-4 text-right">Opciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -413,10 +413,10 @@ export function SalesView() {
                 const customer = customers.find(c => c.id === s.customer_id);
                 return (
                   <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="text-[11px] font-black text-slate-800">{format(new Date(s.date), 'dd MMM, HH:mm', { locale: es })}</div>
+                    <td className="px-4 py-4">
+                      <div className="text-[11px] md:text-[12px] font-black text-slate-800 uppercase">{format(new Date(s.date), 'dd MMM, HH:mm', { locale: es })}</div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4">
                       {(() => {
                         const looksLikeRut = (str: string) => {
                           const clean = (str || '').replace(/[.-]/g, '');
@@ -434,36 +434,38 @@ export function SalesView() {
 
                         return (
                           <>
-                            <p className="text-xs font-bold text-slate-700">{name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">{rut}</p>
+                            <p className="text-xs font-bold text-slate-700 leading-tight">{name}</p>
+                            <p className="text-[9px] md:text-[10px] text-slate-400 font-mono tracking-tighter uppercase mt-0.5">{rut}</p>
                           </>
                         );
                       })()}
                     </td>
-                    <td className="px-4 py-3 text-sm font-black text-slate-900">{formatCurrency(s.total)}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] px-2 py-0.5 bg-slate-100 rounded font-bold text-slate-500 uppercase tracking-wider">
+                    <td className="px-4 py-4 text-xs md:text-sm font-black text-slate-900">{formatCurrency(s.total)}</td>
+                    <td className="px-4 py-4">
+                      <span className="text-[9px] md:text-[10px] px-2 py-0.5 bg-slate-100 rounded font-bold text-slate-500 uppercase tracking-wider">
                         {s.items.length} SKUS
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right space-x-1">
-                      <button 
-                        onClick={() => handlePrintLabel(s)}
-                        className="bg-white border border-slate-200 text-slate-600 p-1.5 rounded hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                        title="Imprimir Etiqueta"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setSaleToDelete(s);
-                          setIsDeleteModalOpen(true);
-                        }}
-                        className="bg-white border border-slate-200 text-red-500 p-1.5 rounded hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                        title="Eliminar Venta"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button 
+                          onClick={() => handlePrintLabel(s)}
+                          className="bg-white border border-slate-200 text-slate-600 p-2 rounded-lg hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                          title="Imprimir Etiqueta"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setSaleToDelete(s);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="bg-white border border-slate-200 text-red-500 p-2 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                          title="Eliminar Venta"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

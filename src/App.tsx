@@ -185,9 +185,9 @@ export default function App() {
   const avatarUrl = user.user_metadata?.avatar_url || '';
 
   return (
-    <div className="flex h-screen w-full bg-[#F8FAFC] font-sans overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-[#F8FAFC] font-sans overflow-hidden">
       {/* Mobile Header */}
-      <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 w-full">
+      <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30 w-full shrink-0">
         <div className="flex items-center gap-2">
           <img src="/Logo.png" className="w-8 h-8 object-contain" alt="Logo" />
           <span className="font-bold text-slate-900">TH Comercial</span>
@@ -309,8 +309,8 @@ export default function App() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-auto md:h-16 bg-white border-b border-slate-200 flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 md:px-8 py-3 md:py-0 shadow-sm shrink-0 gap-3 md:gap-0">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <header className="h-auto bg-white border-b border-slate-200 flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 md:px-8 py-3 md:h-16 md:py-0 shadow-sm shrink-0 gap-3 md:gap-0">
           <div className="flex items-center gap-4 w-full md:w-1/2">
              <img src="/Logo.png" className="hidden md:block w-8 h-8 object-contain" alt="Logo" />
              <div className="relative w-full">
@@ -322,7 +322,7 @@ export default function App() {
                />
              </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="hidden sm:flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Supabase Sync Active</span>

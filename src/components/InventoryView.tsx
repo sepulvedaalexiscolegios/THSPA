@@ -307,12 +307,12 @@ export function InventoryView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight text-center uppercase">Maestro de Productos</h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mt-1 px-1">Gestión centralizada de catálogo y existencias</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="text-center sm:text-left">
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Maestro de Productos</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 px-1">Gestión centralizada de catálogo y existencias</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
           <input 
             type="file" 
             ref={txtInputRef} 
@@ -321,58 +321,62 @@ export function InventoryView() {
             className="hidden" 
           />
           <button 
-            onClick={() => txtInputRef.current?.click()}
-            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+            onClick={() => setIsModalOpen(true)}
+            className="col-span-2 md:w-auto flex items-center justify-center gap-2 bg-sky-600 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95 order-first md:order-last"
           >
-            <Upload className="w-4 h-4" />
-            <span>Importar TXT</span>
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Producto</span>
           </button>
+          
+          <button 
+            onClick={() => setIsScannerOpen(true)}
+            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-emerald-900/10 hover:bg-emerald-700 transition-all active:scale-95"
+          >
+            <Scan className="w-4 h-4" />
+            <span>Escanear</span>
+          </button>
+
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"
           >
             <Upload className="w-4 h-4 text-slate-400" />
             <span>Excel/CSV</span>
           </button>
+          
+          <button 
+            onClick={() => txtInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+          >
+            <Upload className="w-4 h-4" />
+            <span>TXT</span>
+          </button>
+
           <button 
             onClick={handleClearInventory}
-            className="flex items-center gap-2 bg-slate-50 text-red-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-50 border border-slate-200 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 bg-slate-50 text-red-600 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-red-50 border border-slate-200 transition-all active:scale-95"
           >
             <Trash2 className="w-4 h-4" />
             <span>Vaciar</span>
-          </button>
-          <button 
-            onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg shadow-emerald-900/10 hover:bg-emerald-700 transition-all active:scale-95"
-          >
-            <Scan className="w-4 h-4" />
-            <span>Escaneo QR/Code</span>
-          </button>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo Producto</span>
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">Total Productos</div>
-          <div className="text-2xl font-black text-slate-800">{products.length}</div>
+          <div className="text-xl md:text-2xl font-black text-slate-800">{products.length}</div>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-red-400 uppercase mb-1 tracking-widest">Stock Crítico</div>
-          <div className="text-2xl font-black text-red-600">
+          <div className="text-xl md:text-2xl font-black text-red-600">
             {products.filter(p => p.stock <= p.min_stock).length}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm md:col-span-2">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm col-span-2 lg:col-span-2">
           <div className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">Valorización Total</div>
-          <div className="text-2xl font-black text-emerald-600">
+          <div className="text-xl md:text-2xl font-black text-emerald-600">
             {formatCurrency(products.reduce((acc, p) => acc + (p.price * p.stock), 0))}
           </div>
         </div>
@@ -380,22 +384,22 @@ export function InventoryView() {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-3 border-b border-slate-100 flex flex-col gap-3 bg-slate-50/50">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
                 placeholder="Buscar SKU o nombre..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-md text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                className="w-full pl-9 pr-4 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
             </div>
             
             <select 
               value={selectedCategory}
               onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory('all'); }}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+              className="px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs focus:ring-1 focus:ring-blue-500 outline-none"
             >
               <option value="all">Todas las Categorías</option>
               {uniqueCategories.map(cat => (
@@ -406,7 +410,7 @@ export function InventoryView() {
             <select 
               value={selectedSubcategory}
               onChange={(e) => setSelectedSubcategory(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+              className="px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none"
             >
               <option value="all">Todas las Subcategorías</option>
               {uniqueSubcategories.map(sub => (
@@ -416,16 +420,16 @@ export function InventoryView() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left min-w-[800px]">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU / Producto</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoría / Sub</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Existencias</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">P. Costo</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">P. Venta</th>
-                <th className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Opciones</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU / Producto</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoría / Sub</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Existencias</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">P. Costo</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">P. Venta</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Opciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -433,15 +437,15 @@ export function InventoryView() {
                 const isUnderStock = p.stock <= p.min_stock;
                 return (
                   <tr key={p.id} className={cn("hover:bg-slate-50/50 transition-colors", isUnderStock && "bg-red-50/30")}>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-bold text-slate-700 leading-tight">{p.name}</div>
-                      <div className="text-[10px] font-mono text-slate-400 mt-0.5 uppercase tracking-tighter">SKU: {p.sku}</div>
+                    <td className="px-4 py-4">
+                      <div className="text-xs md:text-sm font-bold text-slate-700 leading-tight">{p.name}</div>
+                      <div className="text-[9px] md:text-[10px] font-mono text-slate-400 mt-0.5 uppercase tracking-tighter">SKU: {p.sku}</div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4">
                       <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{p.category}</div>
                       <div className="text-[9px] text-slate-400 uppercase">{p.subcategory || 'Sin Subcategoría'}</div>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-4 text-center">
                       <span className={cn(
                         "inline-block px-2 py-1 rounded text-xs font-black",
                         isUnderStock ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-700"
@@ -452,25 +456,27 @@ export function InventoryView() {
                         <div className="text-[8px] text-red-500 font-bold uppercase mt-0.5">Stock Crítico</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-xs font-medium text-slate-500 italic">
+                    <td className="px-4 py-4 text-right text-[11px] md:text-xs font-medium text-slate-500 italic whitespace-nowrap">
                       {formatCurrency(p.cost_price || 0)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-black text-slate-700">
+                    <td className="px-4 py-4 text-right text-xs md:text-sm font-black text-slate-700 whitespace-nowrap">
                       {formatCurrency(p.price)}
                     </td>
-                    <td className="px-4 py-3 text-right space-x-1">
-                      <button 
-                        onClick={() => { setEditingProduct(p); setIsModalOpen(true); }}
-                        className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteProduct(p.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <td className="px-4 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1">
+                        <button 
+                          onClick={() => { setEditingProduct(p); setIsModalOpen(true); }}
+                          className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg border border-slate-100 md:border-transparent"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(p.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-slate-100 md:border-transparent"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -552,43 +558,43 @@ export function InventoryView() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <form onSubmit={handleSaveProduct} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSaveProduct} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre del Producto</label>
-                      <input name="name" defaultValue={editingProduct?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre del Producto</label>
+                      <input name="name" defaultValue={editingProduct?.name} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">SKU / Cód. Barras</label>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">SKU / Cód. Barras</label>
                       <div className="relative">
-                        <input name="sku" defaultValue={editingProduct?.sku} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                        <input name="sku" defaultValue={editingProduct?.sku} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                         <button type="button" onClick={() => setIsScannerOpen(true)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-sky-600">
                           <Scan className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Categoría</label>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Categoría</label>
                       <select 
                         name="category" 
                         defaultValue={editingProduct?.category} 
                         required 
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none"
                       >
-                        <option value="">Seleccionar Categoría</option>
+                        <option value="">Seleccionar</option>
                         {categories.map(cat => (
                           <option key={cat.id} value={cat.name}>{cat.name}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Subcategoría</label>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Subcategoría</label>
                       <select 
                         name="subcategory" 
                         defaultValue={editingProduct?.subcategory} 
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none"
                       >
-                        <option value="">Ninguna / Otras</option>
+                        <option value="">Otras</option>
                         {subcategories
                           .filter(sub => {
                             const cat = (editingProduct?.category || '');
@@ -602,24 +608,24 @@ export function InventoryView() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Costo</label>
-                      <input name="costPrice" type="number" defaultValue={editingProduct?.cost_price} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Actual</label>
+                      <input name="stock" type="number" defaultValue={editingProduct?.stock} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
-                      <input name="price" type="number" defaultValue={editingProduct?.price} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Costo</label>
+                      <input name="costPrice" type="number" defaultValue={editingProduct?.cost_price} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Actual</label>
-                      <input name="stock" type="number" defaultValue={editingProduct?.stock} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
+                      <input name="price" type="number" defaultValue={editingProduct?.price} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Crítico (Alerta)</label>
-                      <input name="minStock" type="number" defaultValue={editingProduct?.min_stock} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Stock Crítico (Alerta)</label>
+                      <input name="minStock" type="number" defaultValue={editingProduct?.min_stock} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-slate-900 text-white py-2.5 rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 mt-4 active:scale-95 transition-all">
-                    {editingProduct ? 'Actualizar Producto' : 'Crear Producto'}
+                  <button type="submit" className="w-full bg-slate-900 text-white py-3.5 md:py-2.5 rounded-xl md:rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 mt-2 active:scale-95 transition-all uppercase">
+                    {editingProduct ? 'Actualizar Producto' : 'Guardar Producto'}
                   </button>
                 </form>
               </div>

@@ -174,14 +174,12 @@ export function ParametersView() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Parámetros del Sistema</h2>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Configuración de Categorías y Subcategorías</p>
-        </div>
+      <div className="text-center sm:text-left">
+        <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Parámetros del Sistema</h2>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configuración de Categorías y Subcategorías</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         {/* Categories Section */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">

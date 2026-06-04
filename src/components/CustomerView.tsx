@@ -272,12 +272,12 @@ export function CustomerView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Maestro Clientes</h1>
-          <p className="text-xs text-slate-500">Gestión de cartera y datos de despacho</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="text-center sm:text-left">
+          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Maestro Clientes</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 px-1">Gestión de cartera y datos de despacho</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -293,32 +293,35 @@ export function CustomerView() {
             className="hidden" 
           />
           <button 
-            onClick={() => txtInputRef.current?.click()}
-            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+            onClick={() => setIsModalOpen(true)}
+            className="col-span-2 md:w-auto flex items-center justify-center gap-2 bg-sky-600 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95 order-first md:order-last"
           >
-            <Upload className="w-4 h-4" />
-            <span>Importar TXT</span>
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Cliente</span>
           </button>
+
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"
           >
             <Upload className="w-4 h-4 text-slate-400" />
             <span>Excel/CSV</span>
           </button>
+
+          <button 
+            onClick={() => txtInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+          >
+            <Upload className="w-4 h-4" />
+            <span>TXT</span>
+          </button>
+          
           <button 
             onClick={handleClearCustomers}
-            className="flex items-center gap-2 bg-slate-50 text-red-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-50 border border-slate-200 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 bg-slate-50 text-red-600 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-red-50 border border-slate-200 transition-all active:scale-95"
           >
             <Trash2 className="w-4 h-4" />
             <span>Vaciar</span>
-          </button>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo Cliente</span>
           </button>
         </div>
       </div>
@@ -330,7 +333,7 @@ export function CustomerView() {
           placeholder="Buscar por RUT, Nombre o Dirección..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-md text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full pl-9 pr-4 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
@@ -448,51 +451,53 @@ export function CustomerView() {
                   </button>
                 </div>
                 
-                <form id="customerForm" onSubmit={handleSaveCustomer} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre Completo</label>
-                        <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT Chileno o Código</label>
-                        <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono Móvil</label>
-                        <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+56 9 1234 5678" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
-                        <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
-                      </div>
+                <form id="customerForm" onSubmit={handleSaveCustomer} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Nombre Completo</label>
+                         <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT o Código</label>
+                         <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
+                    </div>
+                    <div className="space-y-2">
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono Móvil</label>
+                         <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+569..." className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
+                       <div>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
+                         <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                       </div>
                     </div>
                     
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
-                        <input 
-                          name="address" 
-                          defaultValue={editingCustomer?.address} 
-                          placeholder="Calle, Número, Departamento, Comuna"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
-                        />
-                      </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
+                      <input 
+                        name="address" 
+                        defaultValue={editingCustomer?.address} 
+                        placeholder="Calle, Número, Comuna"
+                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
+                      />
                     </div>
+                  </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex gap-2 pt-2">
                     <button 
                       type="button" 
                       onClick={() => { setIsModalOpen(false); setEditingCustomer(null); }}
-                      className="flex-1 px-4 py-2 text-slate-500 text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all border border-transparent"
+                      className="flex-1 px-4 py-3 md:py-2 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all border border-transparent"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit" 
-                      className="flex-3 bg-slate-900 text-white py-2.5 rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 active:scale-95 transition-all"
+                      className="flex-[2] bg-slate-900 text-white py-3.5 md:py-2.5 rounded-xl md:rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 active:scale-95 transition-all uppercase"
                     >
-                      {editingCustomer ? 'Actualizar Ficha' : 'Registrar Cliente'}
+                      {editingCustomer ? 'Actualizar Ficha' : 'Guardar Cliente'}
                     </button>
                   </div>
                 </form>
