@@ -32,6 +32,9 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
+  // Mobile actions state
+  const [mobileActionQuotation, setMobileActionQuotation] = useState<{ q: Quotation; correlative: number } | null>(null);
+
   // Custom Alert & Delete State
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [quotationToDelete, setQuotationToDelete] = useState<string | null>(null);
@@ -772,7 +775,18 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 const { mainLabel, subLabel } = getCustomerLabels(customer, q.customer_name);
 
                 return (
-                  <tr key={q.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr 
+                    key={q.id} 
+                    className="hover:bg-slate-50/50 transition-colors cursor-pointer md:cursor-default active:bg-slate-100/70"
+                    onClick={(e) => {
+                      if (window.innerWidth < 768) {
+                        if ((e.target as HTMLElement).closest('button')) {
+                          return;
+                        }
+                        setMobileActionQuotation({ q, correlative });
+                      }
+                    }}
+                  >
                     <td className="px-3 md:px-4 py-4 font-mono text-[13px] md:text-[14px] text-slate-500 font-extrabold whitespace-nowrap text-center">
                       {correlative}
                     </td>
@@ -1444,6 +1458,173 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 >
                   {isDeleting ? 'Borrando...' : 'Sí, Borrar'}
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Actions Modal */}
+      <AnimatePresence>
+        {mobileActionQuotation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setMobileActionQuotation(null)}
+          >
+            <motion.div
+              initial={{ y: "100%", opacity: 0.5 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0.5 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden p-6 text-left border-t border-slate-100 sm:border-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Handle bar for bottom drawer effect on mobile */}
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 sm:hidden" />
+
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                    Opciones de Cotización
+                  </span>
+                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5 mt-0.5">
+                    Cotización N° {mobileActionQuotation.correlative}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setMobileActionQuotation(null)}
+                  className="p-1 px-2.5 py-1 text-slate-400 hover:text-slate-600 rounded-lg bg-slate-50 transition-all font-bold text-sm"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Quick Info */}
+              <div className="bg-slate-50 p-4 rounded-2xl mb-5 space-y-2 border border-slate-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-medium">Cliente:</span>
+                  <span className="text-xs font-bold text-slate-900 truncate max-w-[220px]">
+                    {(() => {
+                      const customer = customers.find(c => c.id === mobileActionQuotation.q.customer_id);
+                      const { mainLabel } = getCustomerLabels(customer, mobileActionQuotation.q.customer_name);
+                      return mainLabel;
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-medium">RUT / Adicional:</span>
+                  <span className="text-xs font-semibold text-slate-600 truncate max-w-[220px]">
+                    {(() => {
+                      const customer = customers.find(c => c.id === mobileActionQuotation.q.customer_id);
+                      const { subLabel } = getCustomerLabels(customer, mobileActionQuotation.q.customer_name);
+                      return subLabel || 'Sin Registro';
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center font-mono text-xs">
+                  <span className="text-xs text-slate-500 font-sans font-medium">Fecha:</span>
+                  <span className="text-slate-700 font-semibold">
+                    {new Date(mobileActionQuotation.q.date).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-medium">Total:</span>
+                  <span className="text-sm font-black text-slate-900">
+                    {formatCurrency(mobileActionQuotation.q.total)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-100/80">
+                  <span className="text-xs text-slate-500 font-medium">Estado actual:</span>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                    mobileActionQuotation.q.status === 'accepted' ? "bg-emerald-100 text-emerald-700" :
+                    mobileActionQuotation.q.status === 'rejected' ? "bg-red-100 text-red-700" :
+                    "bg-sky-100 text-sky-700"
+                  )}>
+                    {mobileActionQuotation.q.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons list */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    generatePDF(mobileActionQuotation.q, mobileActionQuotation.correlative);
+                    setMobileActionQuotation(null);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 bg-sky-50 text-sky-700 rounded-2xl font-bold text-xs hover:bg-sky-100 active:scale-98 transition-all"
+                >
+                  <Printer className="w-5 h-5 text-sky-600" />
+                  <span>Imprimir / Descargar PDF</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    sendWhatsApp(mobileActionQuotation.q);
+                    setMobileActionQuotation(null);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 bg-emerald-50 text-emerald-700 rounded-2xl font-bold text-xs hover:bg-emerald-100 active:scale-98 transition-all"
+                >
+                  <Send className="w-5 h-5 text-emerald-600" />
+                  <span>Enviar por WhatsApp</span>
+                </button>
+
+                {mobileActionQuotation.q.status !== 'accepted' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleAcceptQuote(mobileActionQuotation.q);
+                        setMobileActionQuotation(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 bg-blue-50 text-blue-700 rounded-2xl font-bold text-xs hover:bg-blue-100 active:scale-98 transition-all"
+                    >
+                      <ShoppingCart className="w-5 h-5 text-blue-600" />
+                      <span>Confirmar Venta / Cierre</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        handleEditQuotation(mobileActionQuotation.q);
+                        setMobileActionQuotation(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 bg-slate-50 text-slate-700 rounded-2xl font-bold text-xs hover:bg-slate-100 active:scale-98 transition-all border border-slate-100"
+                    >
+                      <Edit2 className="w-5 h-5 text-slate-500" />
+                      <span>Editar Cotización</span>
+                    </button>
+                  </>
+                )}
+
+                {mobileActionQuotation.q.status === 'accepted' && (
+                  <button
+                    onClick={() => {
+                      handleResetStatus(mobileActionQuotation.q);
+                      setMobileActionQuotation(null);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 bg-amber-50 text-amber-700 rounded-2xl font-bold text-xs hover:bg-amber-100 active:scale-98 transition-all"
+                  >
+                    <X className="w-5 h-5 text-amber-600" />
+                    <span>Forzar Reinicio a Enviada</span>
+                  </button>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      const qId = mobileActionQuotation.q.id;
+                      setMobileActionQuotation(null);
+                      setQuotationToDelete(qId);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-2xl font-bold text-xs active:scale-98 transition-all"
+                  >
+                    <Trash2 className="w-5 h-5 text-rose-600" />
+                    <span>Eliminar Cotización permanentemente</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
