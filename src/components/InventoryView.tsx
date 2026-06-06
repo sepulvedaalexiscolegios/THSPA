@@ -46,17 +46,41 @@ export function InventoryView() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, categoriesRes, subcategoriesRes] = await Promise.all([
-        supabase.from('products').select('*').order('name'),
+      // Fetch products in chunks to bypass the Supabase 1000-row limit
+      let allProducts: Product[] = [];
+      let from = 0;
+      const limit = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name')
+          .range(from, from + limit - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allProducts = [...allProducts, ...data];
+          if (data.length < limit) {
+            hasMore = false;
+          } else {
+            from += limit;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const [categoriesRes, subcategoriesRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase.from('subcategories').select('*').order('name')
       ]);
 
-      if (productsRes.error) throw productsRes.error;
       if (categoriesRes.error) throw categoriesRes.error;
       if (subcategoriesRes.error) throw subcategoriesRes.error;
 
-      if (productsRes.data) setProducts(productsRes.data);
+      setProducts(allProducts);
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (subcategoriesRes.data) setSubcategories(subcategoriesRes.data);
     } catch (err: any) {
@@ -76,21 +100,37 @@ export function InventoryView() {
       price: Number(formData.get('price')),
       cost_price: Number(formData.get('costPrice')),
       stock: Number(formData.get('stock')),
+      wholesale_price: Number(formData.get('wholesalePrice') || 0),
+      wholesale_min_qty: Number(formData.get('wholesaleMinQty') || 0)
     };
 
     try {
       if (editingProduct) {
         let { error } = await supabase.from('products').update(data).eq('id', editingProduct.id);
-        if (error && (error.message.includes('cost_price') || error.message.includes('column'))) {
-          const { cost_price, ...fallbackData } = data;
+        if (error && (error.message.includes('cost_price') || error.message.includes('wholesale') || error.message.includes('column'))) {
+          const fallbackData = { ...data };
+          if (error.message.includes('wholesale')) {
+            delete (fallbackData as any).wholesale_price;
+            delete (fallbackData as any).wholesale_min_qty;
+          }
+          if (error.message.includes('cost_price')) {
+            delete (fallbackData as any).cost_price;
+          }
           const retry = await supabase.from('products').update(fallbackData).eq('id', editingProduct.id);
           error = retry.error;
         }
         if (error) throw error;
       } else {
         let { error } = await supabase.from('products').insert([data]);
-        if (error && (error.message.includes('cost_price') || error.message.includes('column'))) {
-          const { cost_price, ...fallbackData } = data;
+        if (error && (error.message.includes('cost_price') || error.message.includes('wholesale') || error.message.includes('column'))) {
+          const fallbackData = { ...data };
+          if (error.message.includes('wholesale')) {
+            delete (fallbackData as any).wholesale_price;
+            delete (fallbackData as any).wholesale_min_qty;
+          }
+          if (error.message.includes('cost_price')) {
+            delete (fallbackData as any).cost_price;
+          }
           const retry = await supabase.from('products').insert([fallbackData]);
           error = retry.error;
         }
@@ -450,7 +490,12 @@ export function InventoryView() {
                       {formatCurrency(p.cost_price || 0)}
                     </td>
                     <td className="px-4 py-4 text-right text-xs md:text-sm font-black text-slate-700 whitespace-nowrap">
-                      {formatCurrency(p.price)}
+                      <div>{formatCurrency(p.price)}</div>
+                      {p.wholesale_price && p.wholesale_price > 0 ? (
+                        <div className="text-[9px] md:text-[10px] text-emerald-600 font-bold whitespace-nowrap mt-0.5 uppercase tracking-tighter">
+                          Mayorista: {formatCurrency(p.wholesale_price || 0)} (desde {p.wholesale_min_qty || 3} uds)
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
@@ -614,6 +659,14 @@ export function InventoryView() {
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
                       <input name="price" type="number" defaultValue={editingProduct?.price ?? 0} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta Mayorista</label>
+                      <input name="wholesalePrice" type="number" defaultValue={editingProduct?.wholesale_price ?? 0} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Cant. Mínima Mayorista</label>
+                      <input name="wholesaleMinQty" type="number" defaultValue={editingProduct?.wholesale_min_qty ?? 0} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                   </div>
                   <button type="submit" className="w-full bg-slate-900 text-white py-3.5 md:py-2.5 rounded-xl md:rounded-lg text-xs font-bold shadow-lg shadow-slate-900/10 mt-2 active:scale-95 transition-all uppercase">

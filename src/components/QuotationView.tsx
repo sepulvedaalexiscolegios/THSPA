@@ -79,46 +79,132 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
     }
   }, [isProductModalOpen, products]);
 
+  // Unified Label Logic
+  const getCustomerLabels = (customer?: Customer, fallbackName?: string) => {
+    let mainLabel = 'Cliente (Sin Registro)';
+    let subLabel = '';
+
+    if (customer) {
+      const nameClean = (customer.name || '').trim();
+      const rutClean = (customer.rut || '').trim();
+
+      // Robust Chilean RUT detection: Numeric, points, hyphens, and can end in 'K'
+      const looksLikeRut = (str: string) => {
+        const clean = str.replace(/[.-]/g, '');
+        return /^[0-9]+[0-9kK]?$/.test(clean) && clean.length >= 7 && clean.length <= 10;
+      };
+
+      const isNameLikeRut = looksLikeRut(nameClean);
+      const isRutLikeName = rutClean && !looksLikeRut(rutClean);
+      
+      // If name field looks like a RUT and RUT field looks like a Name, swap them for display
+      if (isNameLikeRut && isRutLikeName) {
+        mainLabel = rutClean;
+        subLabel = nameClean;
+      } else if (isNameLikeRut && !rutClean) {
+        // Only RUT provided in Name field
+        mainLabel = 'Cliente (RUT: ' + nameClean + ')';
+        subLabel = nameClean;
+      } else {
+        mainLabel = nameClean || 'Cliente (Sin Nombre)';
+        subLabel = rutClean || '';
+      }
+      
+      // Override for subLabel in list views if address is available
+      if (customer.address) subLabel = customer.address;
+    } else if (fallbackName) {
+      mainLabel = fallbackName;
+    }
+
+    return { mainLabel, subLabel };
+  };
+
   // Use global search if provided, otherwise local search
   const effectiveSearch = globalSearch !== undefined ? globalSearch : searchTerm;
 
   const filteredQuotations = quotations.filter(q => {
     const customer = customers.find(c => c.id === q.customer_id);
-    const customerName = (customer?.name || '').toLowerCase();
+    const { mainLabel, subLabel } = getCustomerLabels(customer, q.customer_name);
+    
     const qIndex = quotations.findIndex(x => x.id === q.id);
     const qNumber = 20100 + (quotations.length - qIndex);
-    const search = effectiveSearch.toLowerCase();
     
-    return customerName.includes(search) || qNumber.toString().includes(search);
+    // Normalization helper to handle Spanish accents/tildes
+    const norm = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    const searchNorm = norm(effectiveSearch);
+    if (!searchNorm) return true;
+
+    const mainLabelNorm = norm(mainLabel);
+    const subLabelNorm = norm(subLabel);
+    
+    // Additional fields on customer object
+    const customerNameNorm = customer ? norm(customer.name || '') : '';
+    const customerRutNorm = customer ? norm(customer.rut || '') : '';
+    const customerEmailNorm = customer ? norm(customer.email || '') : '';
+    const customCustomerNameNorm = norm(q.customer_name || '');
+    
+    return mainLabelNorm.includes(searchNorm) || 
+           subLabelNorm.includes(searchNorm) || 
+           customerNameNorm.includes(searchNorm) ||
+           customerRutNorm.includes(searchNorm) ||
+           customerEmailNorm.includes(searchNorm) ||
+           customCustomerNameNorm.includes(searchNorm) ||
+           qNumber.toString().includes(searchNorm);
   });
 
   const fetchData = async () => {
     try {
       console.log('Fetching all necessary data for QuotationView...');
-      const [qRes, cRes, pRes, catRes, subRes] = await Promise.all([
+      
+      // Fetch products in chunks to bypass the Supabase 1000-row limit
+      let allProducts: Product[] = [];
+      let from = 0;
+      const limit = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name')
+          .range(from, from + limit - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allProducts = [...allProducts, ...data];
+          if (data.length < limit) {
+            hasMore = false;
+          } else {
+            from += limit;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const [qRes, cRes, catRes, subRes] = await Promise.all([
         supabase.from('quotations').select('*').order('date', { ascending: false }),
         supabase.from('customers').select('*').order('name'),
-        supabase.from('products').select('*').order('name'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('subcategories').select('*').order('name')
       ]);
 
       if (qRes.error) console.error('Error fetching quotations:', qRes.error);
       if (cRes.error) console.error('Error fetching customers:', cRes.error);
-      if (pRes.error) console.error('Error fetching products:', pRes.error);
       if (catRes.error) console.error('Error fetching categories:', catRes.error);
       if (subRes.error) console.error('Error fetching subcategories:', subRes.error);
 
       if (qRes.data) setQuotations(qRes.data);
       if (cRes.data) setCustomers(cRes.data);
-      if (pRes.data) setProducts(pRes.data);
+      setProducts(allProducts);
       if (catRes.data) setCategories(catRes.data);
       if (subRes.data) setSubcategories(subRes.data);
 
       console.log('Data loaded:', {
         quotations: qRes.data?.length,
         customers: cRes.data?.length,
-        products: pRes.data?.length,
+        products: allProducts.length,
         categories: catRes.data?.length,
         subcategories: subRes.data?.length
       });
@@ -129,20 +215,35 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
 
   const total = quoteItems.reduce((acc, item) => acc + item.subtotal, 0);
 
+  const getEffectivePrice = (product: Product | undefined, qty: number): number => {
+    if (!product) return 0;
+    const normalPrice = product.price || 0;
+    const wholesalePrice = product.wholesale_price;
+    const minQty = product.wholesale_min_qty;
+    
+    if (wholesalePrice && wholesalePrice > 0 && minQty && minQty > 0 && qty >= minQty) {
+      return wholesalePrice;
+    }
+    return normalPrice;
+  };
+
   const handleAddItem = (p: Product) => {
     const existing = quoteItems.find(i => i.productId === p.id);
     if (existing) {
+      const newQty = existing.qty + 1;
+      const unitPrice = getEffectivePrice(p, newQty);
       setQuoteItems(quoteItems.map(i => 
-        i.productId === p.id ? { ...i, qty: i.qty + 1, subtotal: (i.qty + 1) * i.price } : i
+        i.productId === p.id ? { ...i, qty: newQty, price: unitPrice, subtotal: newQty * unitPrice } : i
       ));
     } else {
+      const unitPrice = getEffectivePrice(p, 1);
       setQuoteItems([...quoteItems, {
         productId: p.id,
         name: p.name,
         sku: p.sku,
         qty: 1,
-        price: p.price,
-        subtotal: p.price
+        price: unitPrice,
+        subtotal: unitPrice
       }]);
     }
   };
@@ -152,10 +253,21 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   };
 
   const updateItemQty = (productId: string, delta: number) => {
+    const product = products.find(p => p.id === productId);
     setQuoteItems(quoteItems.map(item => {
       if (item.productId === productId) {
         const newQty = Math.max(1, item.qty + delta);
-        return { ...item, qty: newQty, subtotal: newQty * item.price };
+        const unitPrice = getEffectivePrice(product, newQty);
+        return { ...item, qty: newQty, price: unitPrice, subtotal: newQty * unitPrice };
+      }
+      return item;
+    }));
+  };
+
+  const updateItemPrice = (productId: string, newPrice: number) => {
+    setQuoteItems(quoteItems.map(item => {
+      if (item.productId === productId) {
+        return { ...item, price: newPrice, subtotal: item.qty * newPrice };
       }
       return item;
     }));
@@ -252,13 +364,29 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
       price: Number(formData.get('price')),
       cost_price: Number(formData.get('costPrice')),
       stock: Number(formData.get('stock')),
+      wholesale_price: Number(formData.get('wholesalePrice') || 0),
+      wholesale_min_qty: Number(formData.get('wholesaleMinQty') || 0)
     };
 
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('products')
         .insert([productData])
         .select();
+
+      if (error && (error.message.includes('cost_price') || error.message.includes('wholesale') || error.message.includes('column'))) {
+        const fallbackData = { ...productData };
+        if (error.message.includes('wholesale')) {
+          delete (fallbackData as any).wholesale_price;
+          delete (fallbackData as any).wholesale_min_qty;
+        }
+        if (error.message.includes('cost_price')) {
+          delete (fallbackData as any).cost_price;
+        }
+        const retry = await supabase.from('products').insert([fallbackData]).select();
+        error = retry.error;
+        data = retry.data;
+      }
 
       if (error) throw error;
       
@@ -318,46 +446,6 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
     setSearchProduct('');
   };
 
-  // Unified Label Logic
-  const getCustomerLabels = (customer?: Customer, fallbackName?: string) => {
-    let mainLabel = 'Cliente (Sin Registro)';
-    let subLabel = '';
-
-    if (customer) {
-      const nameClean = (customer.name || '').trim();
-      const rutClean = (customer.rut || '').trim();
-
-      // Robust Chilean RUT detection: Numeric, points, hyphens, and can end in 'K'
-      const looksLikeRut = (str: string) => {
-        const clean = str.replace(/[.-]/g, '');
-        return /^[0-9]+[0-9kK]?$/.test(clean) && clean.length >= 7 && clean.length <= 10;
-      };
-
-      const isNameLikeRut = looksLikeRut(nameClean);
-      const isRutLikeName = rutClean && !looksLikeRut(rutClean);
-      
-      // If name field looks like a RUT and RUT field looks like a Name, swap them for display
-      if (isNameLikeRut && isRutLikeName) {
-        mainLabel = rutClean;
-        subLabel = nameClean;
-      } else if (isNameLikeRut && !rutClean) {
-        // Only RUT provided in Name field
-        mainLabel = 'Cliente (RUT: ' + nameClean + ')';
-        subLabel = nameClean;
-      } else {
-        mainLabel = nameClean || 'Cliente (Sin Nombre)';
-        subLabel = rutClean || '';
-      }
-      
-      // Override for subLabel in list views if address is available
-      if (customer.address) subLabel = customer.address;
-    } else if (fallbackName) {
-      mainLabel = fallbackName;
-    }
-
-    return { mainLabel, subLabel };
-  };
-
   const sendWhatsApp = (q: Quotation) => {
     const customer = customers.find(c => c.id === q.customer_id);
     if (!customer?.phone) {
@@ -365,10 +453,13 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
       return;
     }
     
+    const qIndex = quotations.findIndex(x => x.id === q.id);
+    const qNumber = 20100 + (quotations.length - qIndex);
+    
     const { mainLabel } = getCustomerLabels(customer, q.customer_name);
     const firstName = (mainLabel || '').split(' ')[0].toUpperCase();
     
-    const text = `👋 Hola ${firstName}, adjuntamos su cotización de TH Comercial:\n\n` +
+    const text = `👋 Hola ${firstName}, adjuntamos su cotización *N° ${qNumber}* de TH Comercial:\n\n` +
       q.items.map(i => `* ${i.name.toUpperCase()} (${i.qty} x ${formatCurrency(i.price)})`).join('\n') +
       `\n💰 *TOTAL: ${formatCurrency(q.total)}*\n\n` +
       `Desde ya, agradecemos su preferencia 🙌\n` +
@@ -673,7 +764,8 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {quotations.map((q, index) => {
+              {filteredQuotations.map((q) => {
+                const index = quotations.findIndex(x => x.id === q.id);
                 const correlative = 20100 + (quotations.length - index);
                 const customer = customers.find(c => c.id === q.customer_id);
                 
@@ -887,7 +979,14 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                           >
                             <div className="text-left flex-1 min-w-0 mr-2">
                               <p className="font-bold text-slate-900 text-xs md:text-sm truncate">{p.name}</p>
-                              <p className="text-[9px] md:text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{p.sku} • {formatCurrency(p.price)}</p>
+                              <p className="text-[9px] md:text-[10px] text-gray-400 font-mono tracking-tighter uppercase">
+                                {p.sku} • {formatCurrency(p.price)}
+                                {p.wholesale_price && p.wholesale_price > 0 ? (
+                                  <span className="text-emerald-600 font-semibold ml-1">
+                                    • MAYORISTA: {formatCurrency(p.wholesale_price)} (DESDE {p.wholesale_min_qty || 3} UDS)
+                                  </span>
+                                ) : null}
+                              </p>
                             </div>
                             <div className="bg-slate-50 p-1.5 md:p-2 rounded-lg group-hover:bg-sky-600 group-hover:text-white transition-all text-slate-400">
                               <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -926,7 +1025,16 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                             >
                               <Plus className="w-2.5 h-2.5 md:w-3 md:h-3" />
                             </button>
-                            <span className="text-[9px] md:text-[10px] text-gray-400 ml-1">x {formatCurrency(item.price)}</span>
+                            <span className="text-[9px] md:text-[10px] text-gray-400 ml-1">x</span>
+                            <div className="flex items-center bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 max-w-[85px] md:max-w-[105px]">
+                              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 mr-0.5">$</span>
+                              <input 
+                                type="number" 
+                                value={item.price}
+                                onChange={(e) => updateItemPrice(item.productId, Math.max(0, Number(e.target.value)))}
+                                className="w-full bg-transparent outline-none text-[10px] md:text-xs font-bold text-slate-700 p-0 focus:ring-0"
+                              />
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3">
@@ -946,8 +1054,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                     </div>
                     <button
                       onClick={handleSaveQuotation}
-                      disabled={!selectedCustomer || quoteItems.length === 0}
-                      className="w-full bg-slate-900 text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold shadow-xl shadow-slate-200 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
+                      className="w-full bg-slate-900 text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold shadow-xl shadow-slate-200 transition-all active:scale-95"
                     >
                       Generar y Guardar
                     </button>
@@ -1122,6 +1229,14 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                     <div>
                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta</label>
                       <input name="price" type="number" defaultValue="0" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">P. Venta Mayorista</label>
+                      <input name="wholesalePrice" type="number" defaultValue="0" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Cant. Mínima Mayorista</label>
+                      <input name="wholesaleMinQty" type="number" defaultValue="0" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none" />
                     </div>
                   </div>
 

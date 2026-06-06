@@ -9,6 +9,8 @@ export interface Product {
   cost_price: number;
   unit: string;
   image_url?: string;
+  wholesale_price?: number;
+  wholesale_min_qty?: number;
 }
 
 export interface Customer {

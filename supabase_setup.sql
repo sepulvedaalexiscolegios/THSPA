@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS public.products (
     cost_price DOUBLE PRECISION DEFAULT 0,
     stock DOUBLE PRECISION DEFAULT 0,
     min_stock DOUBLE PRECISION DEFAULT 0,
+    wholesale_price DOUBLE PRECISION DEFAULT 0,
+    wholesale_min_qty INTEGER DEFAULT 0,
     unit TEXT DEFAULT 'Unidad',
     image_url TEXT,
     created_at TIMESTAMPTZ DEFAULT now()

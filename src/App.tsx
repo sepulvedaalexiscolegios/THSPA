@@ -320,7 +320,12 @@ export default function App() {
                 type="text" 
                 placeholder="Buscar por cliente o N°..." 
                 value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
+                onChange={(e) => {
+                  setGlobalSearch(e.target.value);
+                  if (e.target.value && currentView !== 'quotations') {
+                    setCurrentView('quotations');
+                  }
+                }}
                 className="block w-full pl-10 pr-3 py-1.5 border border-slate-300 rounded-md leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-xs" 
                />
              </div>
