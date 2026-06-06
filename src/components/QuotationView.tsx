@@ -1012,48 +1012,48 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 </div>
 
                 {/* Right Side: Cart */}
-                <div className="bg-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col">
-                  <h3 className="text-[10px] md:text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
+                <div className="bg-slate-900 text-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col">
+                  <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
                   <div className="flex-1 space-y-2 md:space-y-3 mb-4 md:mb-6 overflow-y-auto">
                     {quoteItems.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2 py-8">
-                        <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 opacity-30" />
+                      <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2 py-8">
+                        <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 opacity-30 text-slate-400" />
                         <p className="text-xs md:text-sm">Sin productos seleccionados</p>
                       </div>
                     )}
                     {quoteItems.map(item => (
-                      <div key={item.productId} className="flex items-center justify-between bg-white p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm border border-gray-50 group">
+                      <div key={item.productId} className="flex items-center justify-between bg-slate-800 p-2 md:p-3 rounded-lg md:rounded-xl shadow-sm border border-slate-700/50 group">
                         <div className="flex-1 min-w-0 mr-2 md:mr-4">
-                          <p className="font-bold text-slate-900 text-[11px] md:text-sm truncate leading-none uppercase">{item.name}</p>
+                          <p className="font-bold text-slate-100 text-[11px] md:text-sm truncate leading-none uppercase">{item.name}</p>
                           <div className="flex items-center gap-1.5 md:gap-2 mt-1 md:mt-0.5">
                             <button 
                               onClick={() => updateItemQty(item.productId, -1)}
-                              className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
+                              className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white rounded transition-colors"
                             >
                               <Minus className="w-2.5 h-2.5 md:w-3 md:h-3" />
                             </button>
-                            <span className="text-[10px] md:text-xs font-black text-slate-700 w-4 md:w-5 text-center">{item.qty}</span>
+                            <span className="text-[10px] md:text-xs font-black text-slate-200 w-4 md:w-5 text-center">{item.qty}</span>
                             <button 
                                onClick={() => updateItemQty(item.productId, 1)}
-                               className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded transition-colors"
+                               className="w-4 h-4 md:w-5 md:h-5 flex items-center justify-center bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white rounded transition-colors"
                             >
                               <Plus className="w-2.5 h-2.5 md:w-3 md:h-3" />
                             </button>
-                            <span className="text-[9px] md:text-[10px] text-gray-400 ml-1">x</span>
-                            <div className="flex items-center bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 max-w-[85px] md:max-w-[105px]">
-                              <span className="text-[9px] md:text-[10px] font-bold text-slate-400 mr-0.5">$</span>
+                            <span className="text-[9px] md:text-[10px] text-slate-400 ml-1">x</span>
+                            <div className="flex items-center bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 max-w-[85px] md:max-w-[105px]">
+                              <span className="text-[9px] md:text-[10px] font-bold text-slate-500 mr-0.5">$</span>
                               <input 
                                 type="number" 
                                 value={item.price}
                                 onChange={(e) => updateItemPrice(item.productId, Math.max(0, Number(e.target.value)))}
-                                className="w-full bg-transparent outline-none text-[10px] md:text-xs font-bold text-slate-700 p-0 focus:ring-0"
+                                className="w-full bg-transparent outline-none text-[10px] md:text-xs font-bold text-slate-200 p-0 focus:ring-0"
                               />
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3">
-                          <span className="font-bold text-slate-900 text-xs md:text-sm">{formatCurrency(item.subtotal)}</span>
-                          <button onClick={() => handleRemoveItem(item.productId)} className="text-slate-200 hover:text-red-500 p-1 transition-colors">
+                          <span className="font-bold text-white text-xs md:text-sm">{formatCurrency(item.subtotal)}</span>
+                          <button onClick={() => handleRemoveItem(item.productId)} className="text-slate-400 hover:text-rose-400 p-1 transition-colors">
                             <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                           </button>
                         </div>
@@ -1061,14 +1061,14 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                     ))}
                   </div>
 
-                  <div className="space-y-3 md:space-y-4 pt-3 md:pt-4 border-t border-slate-200">
-                    <div className="flex justify-between items-center text-base md:text-lg font-extrabold text-slate-900 px-1 md:px-2">
+                  <div className="space-y-3 md:space-y-4 pt-3 md:pt-4 border-t border-slate-850">
+                    <div className="flex justify-between items-center text-base md:text-lg font-extrabold text-white px-1 md:px-2">
                       <span>Total</span>
                       <span>{formatCurrency(total)}</span>
                     </div>
                     <button
                       onClick={handleSaveQuotation}
-                      className="w-full bg-slate-900 text-white py-3.5 md:py-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold shadow-xl shadow-slate-200 transition-all active:scale-95"
+                      className="w-full bg-sky-600 text-white hover:bg-sky-500 py-3.5 md:py-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold shadow-xl shadow-sky-950/20 transition-all active:scale-95"
                     >
                       Generar y Guardar
                     </button>
