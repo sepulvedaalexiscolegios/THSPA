@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, FileText, Send, ShoppingCart, Trash2, X, ChevronRight, UserPlus, Edit2, Minus, AlertCircle, CheckCircle2, Printer } from 'lucide-react';
+import { Plus, Search, FileText, Send, ShoppingCart, Trash2, X, ChevronRight, UserPlus, Edit2, Minus, AlertCircle, CheckCircle2, Printer, Truck } from 'lucide-react';
 import { Quotation, Customer, Product, QuotationItem, Category, Subcategory } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -42,8 +42,59 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const [quotationToDelete, setQuotationToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Transport State
+  const [isTransportModalOpen, setIsTransportModalOpen] = useState(false);
+  const [transportValue, setTransportValue] = useState<string>('');
+
   const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'error') => {
     setAlertConfig({ title, message, type });
+  };
+
+  const openTransportModal = () => {
+    const existing = quoteItems.find(i => i.sku?.toUpperCase() === 'TRANSPORTE' || i.productId === 'TRANSPORTE_ITEM');
+    if (existing) {
+      setTransportValue(existing.price.toString());
+    } else {
+      setTransportValue('');
+    }
+    setIsTransportModalOpen(true);
+  };
+
+  const handleAddTransportItem = (value: number) => {
+    const transportProduct = products.find(p => p.sku?.toUpperCase() === 'TRANSPORTE' || p.name?.toLowerCase().includes('transporte'));
+    
+    const productId = transportProduct ? transportProduct.id : 'TRANSPORTE_ITEM';
+    const name = transportProduct ? transportProduct.name : 'TRANSPORTE';
+    const sku = transportProduct ? transportProduct.sku : 'TRANSPORTE';
+    
+    const existing = quoteItems.find(i => i.productId === productId || i.sku?.toUpperCase() === 'TRANSPORTE');
+    if (existing) {
+      setQuoteItems(quoteItems.map(i => 
+        (i.productId === productId || i.sku?.toUpperCase() === 'TRANSPORTE') 
+          ? { ...i, price: value, subtotal: value * i.qty } 
+          : i
+      ));
+    } else {
+      setQuoteItems([...quoteItems, {
+        productId,
+        name,
+        sku,
+        qty: 1,
+        price: value,
+        subtotal: value
+      }]);
+    }
+  };
+
+  const handleSaveTransport = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const val = Number(transportValue);
+    if (isNaN(val) || val < 0) {
+      showAlert("Error", "Por favor ingrese un valor de transporte válido.");
+      return;
+    }
+    handleAddTransportItem(val);
+    setIsTransportModalOpen(false);
   };
 
   useEffect(() => {
@@ -742,19 +793,40 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">Cotizaciones</h1>
-          <p className="text-[10px] md:text-xs text-slate-500">Gestión de presupuestos y cierre de ventas</p>
+    <div className="space-y-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/50 p-2 rounded-2xl border border-slate-100 sm:border-0 sm:bg-transparent sm:p-0">
+        <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight shrink-0 text-center md:text-left">Cotizaciones</h1>
+        
+        <div className="flex-1 flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-end w-full">
+          {/* Multimodal Search Input */}
+          <div className="relative flex-1 max-w-md w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+            <input 
+              type="text" 
+              placeholder="Buscar por N° de cotización o cliente..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-medium text-slate-800"
+            />
+            {searchTerm && (
+              <button 
+                type="button" 
+                onClick={() => setSearchTerm('')} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 bg-sky-500 text-white px-4 py-2 rounded-xl text-xs font-black shadow-md shadow-sky-900/10 hover:bg-sky-600 transition-all active:scale-95 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Generar Cotización</span>
+          </button>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-sky-500 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-600 transition-all active:scale-95 w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Generar Cotización</span>
-        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -1091,7 +1163,20 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
 
                 {/* Right Side: Cart (Desktop only) */}
                 <div className="hidden md:flex bg-slate-900 text-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex-col">
-                  <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
+                  <div className="flex justify-between items-center mb-3 md:mb-4">
+                    <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Resumen</h3>
+                    {quoteItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={openTransportModal}
+                        className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg text-[9px] uppercase font-black tracking-wider transition-all cursor-pointer shadow-sm border border-slate-700/50"
+                        title="Agregar Transporte"
+                      >
+                        <Truck className="w-3.5 h-3.5 text-sky-400" />
+                        <span>+ Transporte</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex-1 space-y-2 md:space-y-3 mb-4 md:mb-6 overflow-y-auto">
                     {quoteItems.length === 0 && (
                       <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2 py-8">
@@ -1310,16 +1395,38 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 </h3>
                 <p className="text-[10px] font-bold text-slate-400">Verifica cantidades, precios y genera la cotización</p>
               </div>
-              <button 
-                onClick={() => setIsMobileCartOpen(false)}
-                className="p-2 hover:bg-slate-900 rounded-full text-slate-400 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                {quoteItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={openTransportModal}
+                    className="p-2 bg-slate-900 border border-slate-850 text-slate-300 hover:text-white rounded-lg flex items-center justify-center cursor-pointer transition-all shrink-0"
+                    title="Agregar Transporte"
+                  >
+                    <Truck className="w-4 h-4 text-sky-450" />
+                  </button>
+                )}
+                <button 
+                  onClick={() => setIsMobileCartOpen(false)}
+                  className="p-1.5 hover:bg-slate-900 rounded-full text-slate-400 cursor-pointer shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable Cart items */}
             <div className="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1 pb-28 custom-scrollbar">
+              {quoteItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={openTransportModal}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 bg-slate-900/60 hover:bg-slate-900 border border-dashed border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm mb-1"
+                >
+                  <Truck className="w-4 h-4 text-sky-400" />
+                  Configurar Valor Transporte
+                </button>
+              )}
               {quoteItems.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2 py-12">
                   <ShoppingCart className="w-10 h-10 opacity-30 text-slate-500" />
@@ -1701,6 +1808,76 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                   )}
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Transport Modal */}
+      <AnimatePresence>
+        {isTransportModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-slate-200 p-6 md:p-8"
+            >
+              <form onSubmit={handleSaveTransport} className="space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <span className="font-black text-slate-800 text-sm uppercase tracking-wider">Transporte</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsTransportModalOpen(false)}
+                    className="p-1 hover:bg-slate-100 rounded-full text-slate-400 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Valor del Transporte (CLP)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">$</span>
+                    <input 
+                      type="number"
+                      placeholder="Ej: 5000"
+                      value={transportValue}
+                      onChange={(e) => setTransportValue(e.target.value)}
+                      required
+                      autoFocus
+                      className="w-full pl-7 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-850 outline-none focus:ring-2 focus:ring-sky-500/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setIsTransportModalOpen(false)}
+                    className="flex-1 py-2.5 bg-slate-150 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl font-black text-xs hover:bg-sky-700 shadow-md shadow-sky-600/10 transition-all cursor-pointer uppercase tracking-wider"
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
