@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, MapPin, Phone, Mail, Edit2, Trash2, X, Users, Upload } from 'lucide-react';
+import { Plus, Search, MapPin, Phone, Mail, Edit2, Trash2, X, Users, Upload, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { Customer } from '../types';
 import { formatCLPRUT, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -17,22 +17,189 @@ export function CustomerView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const txtInputRef = useRef<HTMLInputElement>(null);
 
+  const [totalCount, setTotalCount] = useState(0);
+  const [limit, setLimit] = useState(100);
+  const [nextCorrelativeCode, setNextCorrelativeCode] = useState('2368');
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const isImportingRef = useRef(false);
+  const searchTermRef = useRef('');
+
+  // Sorting state
+  const [sortField, setSortField] = useState<'name' | 'rut' | 'phone' | 'email' | 'address'>('name');
+  const [sortAscending, setSortAscending] = useState<boolean>(true);
+
+  const sortFieldRef = useRef(sortField);
+  const sortAscendingRef = useRef(sortAscending);
+
   useEffect(() => {
-    fetchCustomers();
-    const channel = supabase.channel('customers_all').on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => fetchCustomers()).subscribe();
+    sortFieldRef.current = sortField;
+  }, [sortField]);
+
+  useEffect(() => {
+    sortAscendingRef.current = sortAscending;
+  }, [sortAscending]);
+
+  useEffect(() => {
+    isImportingRef.current = isImporting;
+  }, [isImporting]);
+
+  useEffect(() => {
+    searchTermRef.current = searchTerm;
+  }, [searchTerm]);
+
+  const loadNextCorrelative = async () => {
+    try {
+      const rutsSet = new Set<string>();
+
+      // 1. Get exact total count of customers in the database
+      const { count, error: countError } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true });
+
+      const totalRows = count || 2500; // Fallback to 2500 if count query fails
+      const chunkSize = 1000;
+      const numPages = Math.ceil(totalRows / chunkSize);
+
+      // 2. Fetch all customer RUTs in parallel pages to be absolutely sure we scan the entire database
+      const promises = [];
+      for (let i = 0; i < numPages; i++) {
+        const from = i * chunkSize;
+        const to = from + chunkSize - 1;
+        promises.push(
+          supabase
+            .from('customers')
+            .select('rut')
+            .range(from, to)
+        );
+      }
+
+      const results = await Promise.all(promises);
+      results.forEach(({ data, error }) => {
+        if (!error && data) {
+          data.forEach(c => {
+            if (c.rut) {
+              rutsSet.add(c.rut);
+            }
+          });
+        }
+      });
+
+      if (rutsSet.size > 0) {
+        let maxNum = 1000;
+
+        rutsSet.forEach(rut => {
+          const trimmed = rut.trim();
+
+          // Parse CLI-XXXX or CLIXXXX (case-insensitive, with or without hyphen)
+          const matchCLI = trimmed.match(/^cli-?(\d+)$/i);
+          if (matchCLI) {
+            const num = parseInt(matchCLI[1], 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+            return;
+          }
+
+          // Parse pure numeric values (under 1,000,000 to avoid conflicts with Chilean RUTs)
+          const matchPureNumeric = trimmed.match(/^(\d+)$/);
+          if (matchPureNumeric) {
+            const num = parseInt(matchPureNumeric[1], 10);
+            if (!isNaN(num) && num > maxNum && num < 1000000) {
+              maxNum = num;
+            }
+          }
+        });
+
+        // Always suggest the next code formatted as a pure numeric value as requested
+        setNextCorrelativeCode(`${maxNum + 1}`);
+      } else {
+        setNextCorrelativeCode('2368');
+      }
+    } catch (err) {
+      console.error('Error loading next correlative:', err);
+      setNextCorrelativeCode('2368');
+    }
+  };
+
+  const fetchCustomers = async (
+    search: string = '', 
+    currentLimit: number = 100,
+    sortBy: 'name' | 'rut' | 'phone' | 'email' | 'address' = 'name',
+    isAsc: boolean = true
+  ) => {
+    try {
+      let query = supabase.from('customers').select('*', { count: 'exact' });
+      
+      const trimmedSearch = search.trim();
+      if (trimmedSearch) {
+        // Build term search
+        const term = `%${trimmedSearch}%`;
+        query = query.or(`name.ilike.${term},rut.ilike.${term},address.ilike.${term}`);
+      }
+      
+      const { data, error, count } = await query
+        .order(sortBy, { ascending: isAsc })
+        .range(0, currentLimit - 1);
+
+      if (error) throw error;
+      if (data) {
+        setCustomers(data);
+        if (count !== null) setTotalCount(count);
+      }
+    } catch (err: any) {
+      console.error('Error fetching customers:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadNextCorrelative();
+    
+    // Initial fetch
+    fetchCustomers('', 100, sortField, sortAscending);
+
+    const channel = supabase.channel('customers_all').on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+      if (!isImportingRef.current) {
+        fetchCustomers(searchTermRef.current, limit, sortFieldRef.current, sortAscendingRef.current);
+        loadNextCorrelative();
+      }
+    }).subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
   }, []);
 
-  const fetchCustomers = async () => {
-    try {
-      const { data, error } = await supabase.from('customers').select('*').order('name');
-      if (error) throw error;
-      if (data) setCustomers(data);
-    } catch (err: any) {
-      console.error('Error fetching customers:', err);
+  // Debouncing search term input
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setLimit(100);
+      fetchCustomers(searchTerm, 100, sortField, sortAscending);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  // Effect to handle changes in sorting options
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
+    fetchCustomers(searchTerm, limit, sortField, sortAscending);
+  }, [sortField, sortAscending]);
+
+  const handleSort = (field: 'name' | 'rut' | 'phone' | 'email' | 'address') => {
+    if (sortField === field) {
+      setSortAscending(!sortAscending);
+    } else {
+      setSortField(field);
+      setSortAscending(true);
+    }
+  };
+
+  const getNextCorrelativeCode = () => {
+    return nextCorrelativeCode;
   };
 
   const handleImportTXT = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,7 +274,7 @@ export function CustomerView() {
 
         alert(`${importedCount} clientes únicos importados/actualizados con éxito.`);
         if (txtInputRef.current) txtInputRef.current.value = '';
-        fetchCustomers();
+        fetchCustomers(searchTerm, limit, sortField, sortAscending);
       } catch (err: any) {
         alert('Error al importar TXT: ' + err.message);
       } finally {
@@ -121,9 +288,13 @@ export function CustomerView() {
   const handleSaveCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    let rutVal = (formData.get('rut') as string || '').trim();
+    if (!rutVal) {
+      rutVal = getNextCorrelativeCode();
+    }
     const data = {
       name: formData.get('name') as string,
-      rut: formData.get('rut') as string,
+      rut: rutVal,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       address: formData.get('address') as string,
@@ -135,23 +306,63 @@ export function CustomerView() {
         const { error } = await supabase.from('customers').update(data).eq('id', editingCustomer.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('customers').insert([data]);
-        if (error) throw error;
+        let success = false;
+        let attempt = 0;
+        let currentRut = data.rut;
+        let errToThrow = null;
+
+        while (!success && attempt < 5) {
+          const { error } = await supabase.from('customers').insert([{ ...data, rut: currentRut }]);
+          if (!error) {
+            success = true;
+          } else {
+            const isDuplicate = error.code === '23505' || (error.message && error.message.toLowerCase().includes('duplicate'));
+            const isAutogeneratedPattern = /^cli-?(\d+)$/i.test(currentRut) || (/^\d+$/.test(currentRut) && parseInt(currentRut, 10) < 1000000);
+            
+            if (isDuplicate && isAutogeneratedPattern) {
+              attempt++;
+              let prefix = 'CLI';
+              let numStr = '';
+              const matchWithHyphen = currentRut.match(/^cli-(\d+)$/i);
+              const matchNoHyphen = currentRut.match(/^cli(\d+)$/i);
+              const matchPureNumeric = currentRut.match(/^(\d+)$/);
+
+              if (matchWithHyphen) {
+                prefix = 'CLI-';
+                numStr = matchWithHyphen[1];
+              } else if (matchNoHyphen) {
+                prefix = 'CLI';
+                numStr = matchNoHyphen[1];
+              } else if (matchPureNumeric) {
+                prefix = '';
+                numStr = matchPureNumeric[1];
+              }
+
+              const nextNum = parseInt(numStr, 10) + 1;
+              currentRut = `${prefix}${nextNum}`;
+              console.log(`Duplicate customer code detected, retrying with incremented code: ${currentRut} (attempt ${attempt})`);
+            } else {
+              errToThrow = error;
+              break;
+            }
+          }
+        }
+        if (!success && errToThrow) throw errToThrow;
       }
       setIsModalOpen(false);
       setEditingCustomer(null);
-      fetchCustomers();
+      fetchCustomers(searchTerm, limit, sortField, sortAscending);
+      loadNextCorrelative();
     } catch (err: any) {
       alert('Error saving customer: ' + err.message);
     }
   };
 
   const handleDeleteCustomer = async (id: string) => {
-    if (!window.confirm('¿Eliminar este cliente?')) return;
     try {
       const { error } = await supabase.from('customers').delete().eq('id', id);
       if (error) throw error;
-      fetchCustomers();
+      fetchCustomers(searchTerm, limit, sortField, sortAscending);
     } catch (err: any) {
       alert('Error al eliminar cliente: ' + err.message);
     }
@@ -164,7 +375,7 @@ export function CustomerView() {
       const { error } = await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (error) throw error;
       alert('Maestro de clientes vaciado con éxito.');
-      fetchCustomers();
+      fetchCustomers(searchTerm, limit, sortField, sortAscending);
     } catch (err: any) {
       alert('Error clearing customers: ' + err.message);
     }
@@ -252,7 +463,7 @@ export function CustomerView() {
 
         alert(`${importedCount} clientes únicos importados/actualizados con éxito.`);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        fetchCustomers();
+        fetchCustomers(searchTerm, limit, sortField, sortAscending);
       } catch (err: any) {
         console.error('Import error:', err);
         alert('Error al importar clientes: ' + (err.message || 'Error desconocido'));
@@ -265,10 +476,7 @@ export function CustomerView() {
     reader.readAsArrayBuffer(file);
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.rut.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const displayedCustomers = customers;
 
   return (
     <div className="space-y-6">
@@ -277,51 +485,17 @@ export function CustomerView() {
           <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Maestro Clientes</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 px-1">Gestión de cartera y datos de despacho</p>
         </div>
-        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-            accept=".xlsx, .xls, .csv" 
-            className="hidden" 
-          />
-          <input 
-            type="file" 
-            ref={txtInputRef} 
-            onChange={handleImportTXT} 
-            accept=".txt" 
-            className="hidden" 
-          />
+        <div className="flex justify-center sm:justify-end">
           <button 
-            onClick={() => setIsModalOpen(true)}
-            className="col-span-2 md:w-auto flex items-center justify-center gap-2 bg-sky-600 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95 order-first md:order-last"
+            onClick={() => {
+              setEditingCustomer(null);
+              loadNextCorrelative();
+              setIsModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 bg-sky-600 text-white px-4 py-2.5 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo Cliente</span>
-          </button>
-
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"
-          >
-            <Upload className="w-4 h-4 text-slate-400" />
-            <span>Excel/CSV</span>
-          </button>
-
-          <button 
-            onClick={() => txtInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-          >
-            <Upload className="w-4 h-4" />
-            <span>TXT</span>
-          </button>
-          
-          <button 
-            onClick={handleClearCustomers}
-            className="flex items-center justify-center gap-2 bg-slate-50 text-red-600 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-red-50 border border-slate-200 transition-all active:scale-95"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Vaciar</span>
           </button>
         </div>
       </div>
@@ -337,61 +511,165 @@ export function CustomerView() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCustomers.map((c) => (
-          <motion.div 
-            layout
-            key={c.id} 
-            className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative"
-          >
-            <div className="flex justify-between items-start mb-3">
-              <div className="w-8 h-8 bg-slate-50 text-slate-400 rounded-lg flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-all">
-                <Users className="w-4 h-4" />
-              </div>
-              <div className="flex gap-1">
-                <button 
-                  onClick={() => { setEditingCustomer(c); setIsModalOpen(true); }}
-                  className="p-1 px-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-all"
+      <div className="bg-white border border-slate-200 rounded-xl md:rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/75 border-b border-slate-100/80">
+                <th 
+                  onClick={() => handleSort('rut')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
                 >
-                  <Edit2 className="w-3 h-3" />
-                </button>
-                <button 
-                  onClick={() => handleDeleteCustomer(c.id)}
-                  className="p-1 px-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>RUT / Código</span>
+                    <span className="inline-flex">
+                      {sortField === 'rut' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('name')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
                 >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-            
-            <h3 className="text-sm font-black text-slate-800 truncate mb-0.5">{c.name}</h3>
-            <p className="text-[10px] font-mono text-slate-400 mb-3 tracking-tighter uppercase">{formatCLPRUT(c.rut)}</p>
-            
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
-                <Phone className="w-3 h-3 text-slate-300 shrink-0" />
-                <span className="truncate">{c.phone || "N/A"}</span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
-                <Mail className="w-3 h-3 text-slate-300 shrink-0" />
-                <span className="truncate">{c.email || "N/A"}</span>
-              </div>
-              <div className="flex items-start gap-2 text-[11px] text-slate-600 font-medium">
-                <MapPin className="w-3 h-3 text-slate-300 shrink-0 mt-0.5" />
-                <span className="line-clamp-2 leading-tight">{c.address || "N/A"}</span>
-              </div>
-            </div>
-            
-            {c.address && (
-              <div className="mt-3 pt-2 border-t border-slate-50 flex justify-between items-center">
-                <span className="text-[9px] uppercase tracking-widest font-bold text-slate-300">
-                  Data Registrada
-                </span>
-              </div>
-            )}
-          </motion.div>
-        ))}
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>Nombre Cliente</span>
+                    <span className="inline-flex">
+                      {sortField === 'name' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('phone')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                >
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>Teléfono</span>
+                    <span className="inline-flex">
+                      {sortField === 'phone' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('email')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                >
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>Email</span>
+                    <span className="inline-flex">
+                      {sortField === 'email' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('address')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                >
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>Dirección de Despacho</span>
+                    <span className="inline-flex">
+                      {sortField === 'address' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 text-center w-28 select-none">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {displayedCustomers.map((c) => (
+                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors text-xs">
+                  <td className="px-4 py-3.5 font-mono font-bold text-slate-500 whitespace-nowrap uppercase">
+                    {c.rut ? c.rut.toUpperCase() : ''}
+                  </td>
+                  <td className="px-4 py-3.5 font-black text-slate-900 truncate max-w-[180px]">
+                    {c.name}
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-600 font-medium whitespace-nowrap">
+                    {c.phone || <span className="text-slate-300">-</span>}
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-600 font-medium truncate max-w-[160px]">
+                    {c.email || <span className="text-slate-300">-</span>}
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-600 font-medium leading-relaxed truncate max-w-[220px]">
+                    {c.address || <span className="text-slate-300">-</span>}
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <button 
+                        onClick={() => { setEditingCustomer(c); setIsModalOpen(true); }}
+                        className="p-1 px-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-all font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Editar</span>
+                      </button>
+                      <button 
+                        onClick={() => setCustomerToDelete(c)}
+                        className="p-1 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {displayedCustomers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400 font-bold uppercase tracking-wider text-xs">
+                    No se encontraron clientes registrados
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {totalCount > limit && (
+        <div className="flex justify-center items-center gap-3 pt-6 flex-wrap">
+          <button 
+            type="button"
+            onClick={() => {
+              const newLimit = limit + 100;
+              setLimit(newLimit);
+              fetchCustomers(searchTerm, newLimit, sortField, sortAscending);
+            }}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-750 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            Cargar más clientes ({totalCount - limit} restantes)
+          </button>
+          
+          <button 
+            type="button"
+            onClick={() => {
+              setLimit(totalCount);
+              fetchCustomers(searchTerm, totalCount, sortField, sortAscending);
+            }}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer border border-transparent"
+          >
+            Mostrar todos
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {isImporting && (
@@ -451,7 +729,12 @@ export function CustomerView() {
                   </button>
                 </div>
                 
-                <form id="customerForm" onSubmit={handleSaveCustomer} className="space-y-3">
+                <form 
+                  key={editingCustomer ? `edit-${editingCustomer.id}` : `new-${nextCorrelativeCode}`} 
+                  id="customerForm" 
+                  onSubmit={handleSaveCustomer} 
+                  className="space-y-3"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-2">
                        <div>
@@ -459,8 +742,8 @@ export function CustomerView() {
                          <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                        <div>
-                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT o Código</label>
-                         <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT o Código (Opcional - Sugerido)</label>
+                         <input name="rut" defaultValue={editingCustomer ? editingCustomer.rut : getNextCorrelativeCode()} placeholder="12.345.678-9 o Autogenerado" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                     </div>
                     <div className="space-y-2">
@@ -469,8 +752,8 @@ export function CustomerView() {
                          <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+569..." className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                        <div>
-                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
-                         <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email (Opcional)</label>
+                         <input name="email" type="email" defaultValue={editingCustomer?.email} placeholder="ejemplo@correo.com" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                     </div>
                     
@@ -501,6 +784,53 @@ export function CustomerView() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {customerToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-slate-200 p-6 text-center"
+            >
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600 animate-pulse" />
+              </div>
+              <h3 className="text-base font-black text-slate-800 uppercase tracking-wide mb-2">¿Eliminar Cliente?</h3>
+              <p className="text-xs text-slate-500 font-bold mb-6">
+                ¿Está seguro de que desea eliminar a <span className="text-slate-800 font-extrabold">{customerToDelete.name}</span>? esta acción no se puede deshacer.
+              </p>
+              
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setCustomerToDelete(null)}
+                  className="flex-1 py-2.5 text-slate-500 hover:text-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const id = customerToDelete.id;
+                    setCustomerToDelete(null);
+                    await handleDeleteCustomer(id);
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase shadow-lg shadow-red-650/10 active:scale-95 transition-all cursor-pointer"
+                >
+                  Eliminar
+                </button>
               </div>
             </motion.div>
           </motion.div>

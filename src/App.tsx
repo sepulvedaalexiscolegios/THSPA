@@ -314,21 +314,6 @@ export default function App() {
         <header className="h-auto bg-white border-b border-slate-200 flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 md:px-8 py-3 md:h-16 md:py-0 shadow-sm shrink-0 gap-3 md:gap-0">
           <div className="flex items-center gap-4 w-full md:w-1/2">
              <img src="/Logo.png" className="hidden md:block w-8 h-8 object-contain" alt="Logo" />
-             <div className="relative w-full">
-               <Search className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 w-5 h-5 top-1/2 -translate-y-1/2" />
-               <input 
-                type="text" 
-                placeholder="Buscar por cliente o N°..." 
-                value={globalSearch}
-                onChange={(e) => {
-                  setGlobalSearch(e.target.value);
-                  if (e.target.value && currentView !== 'quotations') {
-                    setCurrentView('quotations');
-                  }
-                }}
-                className="block w-full pl-10 pr-3 py-1.5 border border-slate-300 rounded-md leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-xs" 
-               />
-             </div>
           </div>
           <div className="hidden sm:flex items-center gap-6">
             <div className="flex items-center gap-2">

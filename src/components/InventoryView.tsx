@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Scan, Filter, Trash2, Edit2, AlertCircle, X, Upload, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Scan, Filter, Trash2, Edit2, AlertCircle, X, Upload, CheckCircle2, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { Product, Category, Subcategory } from '../types';
 import { Scanner } from './Scanner';
 import { formatCurrency, cn } from '../lib/utils';
@@ -22,6 +22,14 @@ export function InventoryView() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+
+  // New States for pagination, counts and sorting
+  const [limit, setLimit] = useState(100);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sortField, setSortField] = useState<'name' | 'sku' | 'category' | 'subcategory' | 'stock' | 'cost_price' | 'price'>('name');
+  const [sortAscending, setSortAscending] = useState(true);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const txtInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,49 +37,22 @@ export function InventoryView() {
     setAlertConfig({ title, message, type });
   };
 
-  useEffect(() => {
-    fetchData();
+  const limitRef = useRef(limit);
+  const sortFieldRef = useRef(sortField);
+  const sortAscendingRef = useRef(sortAscending);
+  const selectedCategoryRef = useRef(selectedCategory);
+  const selectedSubcategoryRef = useRef(selectedSubcategory);
+  const searchTermRef = useRef(searchTerm);
 
-    // Subscribe to changes
-    const productChannel = supabase.channel('products_all').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchData()).subscribe();
-    const categoryChannel = supabase.channel('categories_all').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchData()).subscribe();
-    const subcategoryChannel = supabase.channel('subcategories_all').on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => fetchData()).subscribe();
+  useEffect(() => { limitRef.current = limit; }, [limit]);
+  useEffect(() => { sortFieldRef.current = sortField; }, [sortField]);
+  useEffect(() => { sortAscendingRef.current = sortAscending; }, [sortAscending]);
+  useEffect(() => { selectedCategoryRef.current = selectedCategory; }, [selectedCategory]);
+  useEffect(() => { selectedSubcategoryRef.current = selectedSubcategory; }, [selectedSubcategory]);
+  useEffect(() => { searchTermRef.current = searchTerm; }, [searchTerm]);
 
-    return () => {
-      supabase.removeChannel(productChannel);
-      supabase.removeChannel(categoryChannel);
-      supabase.removeChannel(subcategoryChannel);
-    };
-  }, []);
-
-  const fetchData = async () => {
+  const fetchCategoriesAndSubcategories = async () => {
     try {
-      // Fetch products in chunks to bypass the Supabase 1000-row limit
-      let allProducts: Product[] = [];
-      let from = 0;
-      const limit = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name')
-          .range(from, from + limit - 1);
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          allProducts = [...allProducts, ...data];
-          if (data.length < limit) {
-            hasMore = false;
-          } else {
-            from += limit;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
       const [categoriesRes, subcategoriesRes] = await Promise.all([
         supabase.from('categories').select('*').order('name'),
         supabase.from('subcategories').select('*').order('name')
@@ -80,14 +61,117 @@ export function InventoryView() {
       if (categoriesRes.error) throw categoriesRes.error;
       if (subcategoriesRes.error) throw subcategoriesRes.error;
 
-      setProducts(allProducts);
       if (categoriesRes.data) setCategories(categoriesRes.data);
       if (subcategoriesRes.data) setSubcategories(subcategoriesRes.data);
-    } catch (err: any) {
-      console.error('Error fetching data:', err);
-      // Only alert on major failures
+    } catch (err) {
+      console.error('Error fetching categories/subcategories:', err);
     }
   };
+
+  const fetchProducts = async (
+    search: string = '',
+    currentLimit: number = 100,
+    sortBy: string = 'name',
+    isAsc: boolean = true,
+    cat: string = 'all',
+    sub: string = 'all'
+  ) => {
+    try {
+      let query = supabase.from('products').select('*', { count: 'exact' });
+
+      const trimmedSearch = search.trim();
+      if (trimmedSearch) {
+        const term = `%${trimmedSearch}%`;
+        query = query.or(`name.ilike.${term},sku.ilike.${term}`);
+      }
+
+      if (cat !== 'all') {
+        query = query.eq('category', cat);
+      }
+
+      if (sub !== 'all') {
+        query = query.eq('subcategory', sub);
+      }
+
+      query = query.order(sortBy, { ascending: isAsc });
+
+      const { data, error, count } = await query.range(0, currentLimit - 1);
+
+      if (error) throw error;
+      if (data) {
+        setProducts(data);
+        if (count !== null) setTotalCount(count);
+      }
+    } catch (err: any) {
+      console.error('Error fetching products:', err);
+    }
+  };
+
+  const fetchData = async () => {
+    await fetchCategoriesAndSubcategories();
+    await fetchProducts(
+      searchTermRef.current,
+      limitRef.current,
+      sortFieldRef.current,
+      sortAscendingRef.current,
+      selectedCategoryRef.current,
+      selectedSubcategoryRef.current
+    );
+  };
+
+  const handleSort = (field: 'name' | 'sku' | 'category' | 'subcategory' | 'stock' | 'cost_price' | 'price') => {
+    if (sortField === field) {
+      setSortAscending(!sortAscending);
+    } else {
+      setSortField(field);
+      setSortAscending(true);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategoriesAndSubcategories();
+
+    // Subscribe to changes
+    const productChannel = supabase.channel('products_all').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+      fetchProducts(
+        searchTermRef.current,
+        limitRef.current,
+        sortFieldRef.current,
+        sortAscendingRef.current,
+        selectedCategoryRef.current,
+        selectedSubcategoryRef.current
+      );
+    }).subscribe();
+
+    const categoryChannel = supabase.channel('categories_all').on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+      fetchCategoriesAndSubcategories();
+    }).subscribe();
+
+    const subcategoryChannel = supabase.channel('subcategories_all').on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => {
+      fetchCategoriesAndSubcategories();
+    }).subscribe();
+
+    return () => {
+      supabase.removeChannel(productChannel);
+      supabase.removeChannel(categoryChannel);
+      supabase.removeChannel(subcategoryChannel);
+    };
+  }, []);
+
+  // Handle debounced search term
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setLimit(100);
+      fetchProducts(searchTerm, 100, sortField, sortAscending, selectedCategory, selectedSubcategory);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  // Handle category/subcategory/sorting changes
+  useEffect(() => {
+    fetchProducts(searchTerm, limit, sortField, sortAscending, selectedCategory, selectedSubcategory);
+  }, [sortField, sortAscending, selectedCategory, selectedSubcategory]);
 
   const handleSaveProduct = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -147,13 +231,14 @@ export function InventoryView() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!window.confirm('¿Eliminar este producto?')) return;
     try {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
+      showAlert("Éxito", 'Producto eliminado con éxito', "success");
       fetchData();
     } catch (err: any) {
-      alert('Error deleting product: ' + err.message);
+      console.error('Error deleting product:', err);
+      showAlert("Error", 'Error al eliminar producto: ' + (err.message || 'Error desconocido'), "error");
     }
   };
 
@@ -338,13 +423,15 @@ export function InventoryView() {
     reader.readAsArrayBuffer(file);
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
-    const matchesSubcategory = selectedSubcategory === 'all' || p.subcategory === selectedSubcategory;
-    return matchesSearch && matchesCategory && matchesSubcategory;
-  });
+  const uniqueCategories = categories.map(c => c.name);
+  const uniqueSubcategories = (() => {
+    if (selectedCategory === 'all') {
+      return subcategories.map(s => s.name);
+    }
+    const catObj = categories.find(c => c.name === selectedCategory);
+    if (!catObj) return [];
+    return subcategories.filter(s => s.category_id === catObj.id).map(s => s.name);
+  })();
 
   useEffect(() => {
     if (isModalOpen && !editingProduct) {
@@ -364,9 +451,6 @@ export function InventoryView() {
     }
   }, [isModalOpen, editingProduct, products]);
 
-  const uniqueCategories = Array.from(new Set(products.map(p => p.category))).sort();
-  const uniqueSubcategories = Array.from(new Set(products.filter(p => selectedCategory === 'all' || p.category === selectedCategory).map(p => p.subcategory))).sort();
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -374,17 +458,10 @@ export function InventoryView() {
           <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Maestro de Productos</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 px-1">Gestión centralizada de catálogo y existencias</p>
         </div>
-        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
-          <input 
-            type="file" 
-            ref={txtInputRef} 
-            onChange={handleImportTXT} 
-            accept=".txt" 
-            className="hidden" 
-          />
+        <div className="flex flex-wrap justify-center sm:justify-end gap-2">
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="col-span-2 md:w-auto flex items-center justify-center gap-2 bg-sky-600 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95 order-first md:order-last"
+            className="flex items-center justify-center gap-2 bg-sky-600 text-white px-4 py-2.5 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-sky-900/10 hover:bg-sky-700 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Nuevo Producto</span>
@@ -392,28 +469,11 @@ export function InventoryView() {
           
           <button 
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold shadow-lg shadow-emerald-900/10 hover:bg-emerald-700 transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl sm:rounded-lg text-xs font-bold shadow-sm hover:bg-slate-200 transition-all active:scale-95"
           >
-            <Scan className="w-4 h-4" />
-            <span>Escanear</span>
+            <Scan className="w-4 h-4 text-slate-500" />
+            <span>Escanear Código</span>
           </button>
-
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-200 transition-all active:scale-95"
-          >
-            <Upload className="w-4 h-4 text-slate-400" />
-            <span>Excel/CSV</span>
-          </button>
-          
-          <button 
-            onClick={() => txtInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-          >
-            <Upload className="w-4 h-4" />
-            <span>TXT</span>
-          </button>
-
         </div>
       </div>
 
@@ -435,7 +495,11 @@ export function InventoryView() {
             
             <select 
               value={selectedCategory}
-              onChange={(e) => { setSelectedCategory(e.target.value); setSelectedSubcategory('all'); }}
+              onChange={(e) => { 
+                setSelectedCategory(e.target.value); 
+                setSelectedSubcategory('all');
+                setLimit(100);
+              }}
               className="px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs focus:ring-1 focus:ring-blue-500 outline-none"
             >
               <option value="all">Todas las Categorías</option>
@@ -446,7 +510,10 @@ export function InventoryView() {
 
             <select 
               value={selectedSubcategory}
-              onChange={(e) => setSelectedSubcategory(e.target.value)}
+              onChange={(e) => {
+                setSelectedSubcategory(e.target.value);
+                setLimit(100);
+              }}
               className="px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-lg sm:rounded-md text-xs focus:ring-1 focus:ring-sky-500 outline-none"
             >
               <option value="all">Todas las Subcategorías</option>
@@ -461,16 +528,86 @@ export function InventoryView() {
           <table className="w-full text-left min-w-[800px]">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU / Producto</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoría / Sub</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Existencias</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">P. Costo</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">P. Venta</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Opciones</th>
+                <th 
+                  onClick={() => handleSort('name')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                >
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>SKU / Producto</span>
+                    <span className="inline-flex">
+                      {sortField === 'name' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('category')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                >
+                  <div className="flex items-center gap-1.5 justify-start">
+                    <span>Categoría / Sub</span>
+                    <span className="inline-flex">
+                      {sortField === 'category' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('stock')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group text-center"
+                >
+                  <div className="flex items-center gap-1.5 justify-center">
+                    <span>Existencias</span>
+                    <span className="inline-flex">
+                      {sortField === 'stock' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('cost_price')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group text-right"
+                >
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span>P. Costo</span>
+                    <span className="inline-flex">
+                      {sortField === 'cost_price' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('price')}
+                  className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group text-right"
+                >
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span>P. Venta</span>
+                    <span className="inline-flex">
+                      {sortField === 'price' ? (
+                        sortAscending ? <ChevronUp className="w-3.5 h-3.5 text-sky-600" /> : <ChevronDown className="w-3.5 h-3.5 text-sky-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-50 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-slate-400 text-right">Opciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredProducts.map((p) => {
+              {products.map((p) => {
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-4">
@@ -506,7 +643,7 @@ export function InventoryView() {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDeleteProduct(p.id)}
+                          onClick={() => setProductToDelete(p)}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-slate-100 md:border-transparent"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -518,13 +655,40 @@ export function InventoryView() {
               })}
             </tbody>
           </table>
-          {filteredProducts.length === 0 && (
+          {products.length === 0 && (
             <div className="p-12 text-center text-slate-400 text-xs italic">
               No se encontraron resultados para la búsqueda.
             </div>
           )}
         </div>
       </div>
+
+      {totalCount > limit && (
+        <div className="flex justify-center items-center gap-3 pt-6 flex-wrap">
+          <button 
+            type="button"
+            onClick={() => {
+              const newLimit = limit + 100;
+              setLimit(newLimit);
+              fetchProducts(searchTerm, newLimit, sortField, sortAscending, selectedCategory, selectedSubcategory);
+            }}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-755 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            Cargar más productos ({totalCount - limit} restantes)
+          </button>
+          
+          <button 
+            type="button"
+            onClick={() => {
+              setLimit(totalCount);
+              fetchProducts(searchTerm, totalCount, sortField, sortAscending, selectedCategory, selectedSubcategory);
+            }}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer border border-transparent"
+          >
+            Mostrar todos
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {isImporting && (
@@ -719,6 +883,53 @@ export function InventoryView() {
               >
                 Entendido
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {productToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-slate-100 p-6 text-center"
+            >
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600 animate-pulse" />
+              </div>
+              <h3 className="text-base font-black text-slate-800 uppercase tracking-wide mb-2">¿Eliminar Producto?</h3>
+              <p className="text-xs text-slate-500 font-bold mb-6">
+                ¿Está seguro de que desea eliminar el producto <span className="text-slate-800 font-extrabold">{productToDelete.name}</span>? esta acción no se puede deshacer.
+              </p>
+              
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setProductToDelete(null)}
+                  className="flex-1 py-2.5 text-slate-500 hover:text-slate-700 text-xs font-bold uppercase tracking-wider rounded-lg border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const id = productToDelete.id;
+                    setProductToDelete(null);
+                    await handleDeleteProduct(id);
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase shadow-lg shadow-red-650/10 active:scale-95 transition-all cursor-pointer"
+                >
+                  Eliminar
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
