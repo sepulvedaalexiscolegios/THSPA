@@ -34,6 +34,8 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
 
   // Mobile actions state
   const [mobileActionQuotation, setMobileActionQuotation] = useState<{ q: Quotation; correlative: number } | null>(null);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Custom Alert & Delete State
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
@@ -447,6 +449,8 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
     setQuoteItems([]);
     setSearchCustomer('');
     setSearchProduct('');
+    setIsMobileSearchOpen(false);
+    setIsMobileCartOpen(false);
   };
 
   const sendWhatsApp = (q: Quotation) => {
@@ -902,52 +906,52 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 {/* Left Side: selection */}
                 <div className="space-y-5 md:space-y-6">
                   <section>
-                    <div className="flex items-center justify-between mb-3 md:mb-4">
-                      <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">1. Cliente Solicitante</h3>
+                    <div className="flex items-center justify-between mb-2 md:mb-3">
+                      <h3 className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest">1. Cliente Solicitante</h3>
                     </div>
                     
                     {!selectedCustomer ? (
                       <button 
                         onClick={() => setIsCustomerPickerOpen(true)}
-                        className="w-full flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed border-slate-200 rounded-2xl md:rounded-3xl hover:border-sky-400 hover:bg-sky-50 transition-all group"
+                        className="w-full flex flex-col items-center justify-center p-5 md:p-8 border-2 border-dashed border-slate-200 rounded-2xl md:rounded-3xl hover:border-sky-400 hover:bg-sky-50 transition-all group"
                       >
-                        <div className="bg-sky-100 p-2.5 md:p-3 rounded-full text-sky-600 mb-2 md:mb-3 group-hover:scale-110 transition-transform">
+                        <div className="bg-sky-100 p-2 md:p-3 rounded-full text-sky-600 mb-1.5 md:mb-3 group-hover:scale-110 transition-transform">
                           <UserPlus className="w-5 h-5 md:w-6 md:h-6" />
                         </div>
                         <p className="font-bold text-slate-800 text-xs md:text-sm">Seleccionar Cliente</p>
-                        <p className="text-[9px] md:text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">Obligatorio</p>
+                        <p className="text-[8px] md:text-[9px] text-slate-400 uppercase font-black tracking-widest mt-0.5">Obligatorio</p>
                       </button>
                     ) : (
-                      <div className="bg-slate-900 p-4 rounded-xl md:rounded-2xl shadow-xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                          <UserPlus className="w-16 h-16 md:w-20 md:h-20 text-white" />
+                      <div className="bg-slate-900 p-2.5 md:p-3 rounded-xl shadow-lg relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-3 opacity-5">
+                          <UserPlus className="w-10 h-10 md:w-12 md:h-12 text-white" />
                         </div>
-                        <div className="relative z-10 flex justify-between items-start">
+                        <div className="relative z-10 flex justify-between items-center gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-[9px] md:text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Seleccionado</p>
+                            <p className="text-[8px] md:text-[9px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Cliente Seleccionado</p>
                             {(() => {
                               const labels = getCustomerLabels(selectedCustomer);
                               return (
                                 <>
-                                  <h4 className="text-white font-bold text-base md:text-lg leading-tight truncate">{labels.mainLabel}</h4>
-                                  <p className="text-slate-400 text-[10px] md:text-xs font-medium mt-0.5 truncate">{labels.subLabel}</p>
+                                  <h4 className="text-white font-bold text-xs md:text-sm leading-tight truncate">{labels.mainLabel}</h4>
+                                  <p className="text-slate-400 text-[9px] md:text-[10px] font-medium truncate mt-0.5">{labels.subLabel}</p>
                                 </>
                               );
                             })()}
                           </div>
-                          <div className="flex flex-col gap-1.5 ml-2">
+                          <div className="flex items-center gap-1.5 shrink-0">
                              <button 
                               onClick={() => {
                                 setEditingCustomer(selectedCustomer);
                                 setIsCustomerModalOpen(true);
                               }}
-                              className="p-1 px-2 text-[8px] md:text-[9px] bg-white/10 text-white border border-white/20 rounded uppercase font-bold hover:bg-white/20 transition-all"
+                              className="p-1 px-2 text-[8px] md:text-[9px] bg-white/10 text-white border border-white/20 rounded uppercase font-bold hover:bg-white/20 transition-all cursor-pointer"
                             >
                               Editar
                             </button>
                             <button 
                               onClick={() => setSelectedCustomer(null)}
-                              className="p-1 px-2 text-[8px] md:text-[9px] bg-red-500/20 text-red-300 border border-red-500/30 rounded uppercase font-bold hover:bg-red-500/40 transition-all"
+                              className="p-1 px-2 text-[8px] md:text-[9px] bg-red-500/20 text-red-300 border border-red-500/30 rounded uppercase font-bold hover:bg-red-500/40 transition-all cursor-pointer"
                             >
                               Cambiar
                             </button>
@@ -957,7 +961,8 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                     )}
                   </section>
 
-                  <section>
+                  {/* Desktop Only Product list */}
+                  <section className="hidden md:block">
                     <div className="flex items-center justify-between mb-3 md:mb-4">
                       <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">2. Productos</h3>
                       <button 
@@ -1009,10 +1014,83 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                         ))}
                      </div>
                   </section>
+
+                  {/* Mobile Only triggers */}
+                  <section className="block md:hidden space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Productos</h3>
+                        <button 
+                          onClick={() => setIsProductModalOpen(true)}
+                          className="flex items-center gap-1 text-sky-600 font-bold"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span className="text-[9px] uppercase">Nuevo</span>
+                        </button>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setIsMobileSearchOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 p-3 bg-sky-50 border border-sky-100 text-sky-700 hover:bg-sky-100 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                      >
+                        <Search className="w-4 h-4 text-sky-600" />
+                        Añadir / Buscar Productos
+                      </button>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">3. Resumen carro</h3>
+                      </div>
+                      
+                      {quoteItems.length === 0 ? (
+                        <div className="p-5 text-center border border-dashed border-slate-200 bg-slate-50/50 rounded-xl text-slate-400 text-xs font-bold uppercase tracking-wide">
+                          Carrito Vacío
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex justify-between items-center shadow-sm">
+                            <div className="text-left">
+                              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide">Elegidos</p>
+                              <p className="text-xs font-black text-slate-800">{quoteItems.length} {quoteItems.length === 1 ? 'ítem' : 'ítems'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide">Total Estimado</p>
+                              <p className="text-sm font-black text-emerald-600">{formatCurrency(total)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => setIsMobileCartOpen(true)}
+                              className="flex-1 flex items-center justify-center gap-1.5 p-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5 text-sky-400" />
+                              Ver Carrito
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={handleSaveQuotation}
+                              disabled={!selectedCustomer}
+                              className={cn(
+                                "flex-1 p-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm",
+                                !selectedCustomer ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                              )}
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </div>
 
-                {/* Right Side: Cart */}
-                <div className="bg-slate-900 text-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col">
+                {/* Right Side: Cart (Desktop only) */}
+                <div className="hidden md:flex bg-slate-900 text-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex-col">
                   <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Resumen</h3>
                   <div className="flex-1 space-y-2 md:space-y-3 mb-4 md:mb-6 overflow-y-auto">
                     {quoteItems.length === 0 && (
@@ -1076,6 +1154,263 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile-Only Product Search Modal */}
+      <AnimatePresence>
+        {isMobileSearchOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed inset-0 z-[150] bg-white flex flex-col p-4 md:hidden"
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 shrink-0">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Añadir Productos</h3>
+                <p className="text-[10px] font-bold text-slate-400">Selecciona los productos y cantidades</p>
+              </div>
+              <button 
+                onClick={() => setIsMobileSearchOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-500 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sticky Search bar */}
+            <div className="my-3 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450 w-4 h-4" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar SKU o Nombre..."
+                  value={searchProduct}
+                  onChange={(e) => setSearchProduct(e.target.value)}
+                  autoFocus
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none font-medium text-slate-800"
+                />
+              </div>
+            </div>
+
+            {/* List with maximized space */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-24 custom-scrollbar">
+              {products
+                .filter(p => !searchProduct || 
+                  (p.name || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1 || 
+                  (p.sku || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1
+                )
+                .slice(0, 50)
+                .map(p => {
+                  const existing = quoteItems.find(i => i.productId === p.id);
+                  const itemQty = existing?.qty || 0;
+                  
+                  return (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        "flex flex-col p-3 bg-white border rounded-xl transition-all",
+                        itemQty > 0 ? "border-sky-550 bg-sky-50/10 shadow-sm" : "border-slate-100 hover:border-slate-200"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-xs truncate">{p.name}</p>
+                          <p className="text-[9px] text-gray-400 font-mono tracking-tighter uppercase mt-0.5">
+                            {p.sku} • <span className="text-slate-700 font-bold">{formatCurrency(p.price)}</span>
+                            {p.wholesale_price && p.wholesale_price > 0 ? (
+                              <span className="text-emerald-600 font-semibold ml-1">
+                                • MAYORISTA: {formatCurrency(p.wholesale_price)} (DESDE {p.wholesale_min_qty || 3} UDS)
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                        
+                        <button
+                          onClick={() => handleAddItem(p)}
+                          className={cn(
+                            "p-1.5 rounded-lg transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer shrink-0",
+                            itemQty > 0 ? "bg-sky-600 text-white shadow-md shadow-sky-600/10" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                          )}
+                        >
+                          {itemQty > 0 ? (
+                            <>
+                              <span>{itemQty}</span>
+                              <Plus className="w-3.5 h-3.5" />
+                            </>
+                          ) : (
+                            <Plus className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Controls inside result box if added */}
+                      {itemQty > 0 && (
+                        <div className="flex items-center justify-between border-t border-slate-100/80 mt-2.5 pt-2.5 gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <button 
+                              onClick={() => updateItemQty(p.id, -1)}
+                              className="w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="text-xs font-black text-slate-800 w-5 text-center">{itemQty}</span>
+                            <button 
+                              onClick={() => updateItemQty(p.id, 1)}
+                              className="w-6 h-6 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded transition-colors cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center bg-slate-50 border border-slate-200 rounded px-2 py-0.5 max-w-[120px]">
+                            <span className="text-[10px] font-bold text-slate-400 mr-0.5">$</span>
+                            <input 
+                              type="number" 
+                              value={existing?.price}
+                              onChange={(e) => updateItemPrice(p.id, Math.max(0, Number(e.target.value)))}
+                              className="w-full bg-transparent outline-none text-xs font-bold text-slate-800 p-0 focus:ring-0 text-right"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Tally & closing overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-slate-900 p-3.5 flex justify-between items-center shadow-2xl border-t border-slate-850 shrink-0">
+              <div className="text-left text-white">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide">Total ({quoteItems.reduce((acc, i) => acc + i.qty, 0)} items)</p>
+                <p className="text-sm font-black text-emerald-400">{formatCurrency(total)}</p>
+              </div>
+              <button
+                onClick={() => setIsMobileSearchOpen(false)}
+                className="bg-sky-600 text-white hover:bg-sky-500 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Listo ({quoteItems.length} prod.)
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile-Only Summary Cart Modal */}
+      <AnimatePresence>
+        {isMobileCartOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed inset-0 z-[150] bg-slate-950 flex flex-col p-4 md:hidden text-slate-100"
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center pb-3 border-b border-slate-800/80 shrink-0">
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <ShoppingCart className="w-4 h-4 text-sky-400" />
+                  Resumen de la Cotización
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400">Verifica cantidades, precios y genera la cotización</p>
+              </div>
+              <button 
+                onClick={() => setIsMobileCartOpen(false)}
+                className="p-2 hover:bg-slate-900 rounded-full text-slate-400 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Cart items */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1 pb-28 custom-scrollbar">
+              {quoteItems.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2 py-12">
+                  <ShoppingCart className="w-10 h-10 opacity-30 text-slate-500" />
+                  <p className="text-xs">Sin productos seleccionados</p>
+                </div>
+              ) : (
+                quoteItems.map(item => (
+                  <div key={item.productId} className="flex flex-col bg-slate-900/60 p-3 rounded-xl shadow-sm border border-slate-800/80">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-100 text-xs truncate uppercase leading-none">{item.name}</p>
+                        <p className="text-[9px] text-slate-400 font-mono tracking-tighter uppercase mt-1">
+                          Ref: Subtotal - <span className="text-emerald-400 font-bold">{formatCurrency(item.subtotal)}</span>
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => handleRemoveItem(item.productId)} 
+                        className="text-slate-400 hover:text-rose-400 p-1 transition-colors shrink-0 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800/60">
+                      {/* Quantity Selector */}
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => updateItemQty(item.productId, -1)}
+                          className="w-7 h-7 flex items-center justify-center bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs font-black text-slate-100 w-5 text-center">{item.qty}</span>
+                        <button 
+                          onClick={() => updateItemQty(item.productId, 1)}
+                          className="w-7 h-7 flex items-center justify-center bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Price input */}
+                      <div className="flex items-center bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 max-w-[130px]">
+                        <span className="text-xs font-bold text-slate-500 mr-1">$</span>
+                        <input 
+                          type="number" 
+                          value={item.price}
+                          onChange={(e) => updateItemPrice(item.productId, Math.max(0, Number(e.target.value)))}
+                          className="w-full bg-transparent outline-none text-xs font-bold text-slate-200 p-0 focus:ring-0 text-right"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Bottom save/checkout panel */}
+            <div className="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 p-4 space-y-3 pb-safe shrink-0">
+              <div className="flex justify-between items-center text-base font-extrabold text-white px-1">
+                <span>Total Cotización</span>
+                <span className="text-emerald-400 font-black">{formatCurrency(total)}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsMobileCartOpen(false);
+                  handleSaveQuotation();
+                }}
+                disabled={!selectedCustomer || quoteItems.length === 0}
+                className={cn(
+                  "w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center",
+                  (!selectedCustomer || quoteItems.length === 0)
+                    ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                    : "bg-sky-600 text-white hover:bg-sky-550 shadow-xl shadow-sky-950/20 active:scale-95"
+                )}
+              >
+                {!selectedCustomer 
+                  ? "Falta Elegir Cliente" 
+                  : quoteItems.length === 0 
+                    ? "Carrito Vacío" 
+                    : "Generar y Guardar"
+                }
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
