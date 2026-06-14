@@ -1165,39 +1165,32 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="fixed inset-0 z-[150] bg-white flex flex-col p-4 md:hidden"
+            className="fixed inset-0 z-[150] bg-white flex flex-col p-2.5 pt-2 md:hidden"
           >
-            {/* Header */}
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100 shrink-0">
-              <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Añadir Productos</h3>
-                <p className="text-[10px] font-bold text-slate-400">Selecciona los productos y cantidades</p>
-              </div>
-              <button 
-                onClick={() => setIsMobileSearchOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-full text-slate-500 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Sticky Search bar */}
-            <div className="my-3 shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450 w-4 h-4" />
+            {/* Super-Compact Header & Search Bar combined */}
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-150 shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                 <input 
                   type="text" 
                   placeholder="Buscar SKU o Nombre..."
                   value={searchProduct}
                   onChange={(e) => setSearchProduct(e.target.value)}
                   autoFocus
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 outline-none font-medium text-slate-800"
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none font-medium text-slate-800 focus:border-slate-400 transition-colors"
                 />
               </div>
+              <button 
+                onClick={() => setIsMobileSearchOpen(false)}
+                className="p-1 px-1.5 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer shrink-0 transition-colors"
+                title="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* List with maximized space */}
-            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-24 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1 pb-20 custom-scrollbar">
               {products
                 .filter(p => !searchProduct || 
                   (p.name || '').toLowerCase().indexOf(searchProduct.toLowerCase()) !== -1 || 
@@ -1212,18 +1205,18 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                     <div
                       key={p.id}
                       className={cn(
-                        "flex flex-col p-3 bg-white border rounded-xl transition-all",
+                        "flex flex-col p-2.5 bg-white border rounded-xl transition-all",
                         itemQty > 0 ? "border-sky-550 bg-sky-50/10 shadow-sm" : "border-slate-100 hover:border-slate-200"
                       )}
                     >
                       <div className="flex items-start justify-between gap-1.5">
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-900 text-xs truncate">{p.name}</p>
-                          <p className="text-[9px] text-gray-400 font-mono tracking-tighter uppercase mt-0.5">
+                          <p className="font-bold text-slate-900 text-[11px] truncate leading-tight">{p.name}</p>
+                          <p className="text-[8.5px] text-gray-400 font-mono tracking-tighter uppercase mt-0.5">
                             {p.sku} • <span className="text-slate-700 font-bold">{formatCurrency(p.price)}</span>
                             {p.wholesale_price && p.wholesale_price > 0 ? (
                               <span className="text-emerald-600 font-semibold ml-1">
-                                • MAYORISTA: {formatCurrency(p.wholesale_price)} (DESDE {p.wholesale_min_qty || 3} UDS)
+                                • MAY. {formatCurrency(p.wholesale_price)} (+{p.wholesale_min_qty || 3})
                               </span>
                             ) : null}
                           </p>
@@ -1232,47 +1225,47 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                         <button
                           onClick={() => handleAddItem(p)}
                           className={cn(
-                            "p-1.5 rounded-lg transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer shrink-0",
+                            "p-1 px-2 rounded-lg transition-all text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer shrink-0",
                             itemQty > 0 ? "bg-sky-600 text-white shadow-md shadow-sky-600/10" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                           )}
                         >
                           {itemQty > 0 ? (
                             <>
                               <span>{itemQty}</span>
-                              <Plus className="w-3.5 h-3.5" />
+                              <Plus className="w-3 h-3" />
                             </>
                           ) : (
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-3.5 h-3.5" />
                           )}
                         </button>
                       </div>
 
                       {/* Controls inside result box if added */}
                       {itemQty > 0 && (
-                        <div className="flex items-center justify-between border-t border-slate-100/80 mt-2.5 pt-2.5 gap-2">
-                          <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-between border-t border-slate-100/80 mt-2 pt-2 gap-2">
+                          <div className="flex items-center gap-1">
                             <button 
                               onClick={() => updateItemQty(p.id, -1)}
-                              className="w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+                              className="w-5 h-5 flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-slate-200 rounded transition-colors cursor-pointer"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-2.5 h-2.5" />
                             </button>
-                            <span className="text-xs font-black text-slate-800 w-5 text-center">{itemQty}</span>
+                            <span className="text-[11px] font-black text-slate-800 w-4.5 text-center">{itemQty}</span>
                             <button 
                               onClick={() => updateItemQty(p.id, 1)}
-                              className="w-6 h-6 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded transition-colors cursor-pointer"
+                              className="w-5 h-5 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded transition-colors cursor-pointer"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-2.5 h-2.5" />
                             </button>
                           </div>
 
-                          <div className="flex items-center bg-slate-50 border border-slate-200 rounded px-2 py-0.5 max-w-[120px]">
-                            <span className="text-[10px] font-bold text-slate-400 mr-0.5">$</span>
+                          <div className="flex items-center bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 max-w-[100px]">
+                            <span className="text-[9px] font-bold text-slate-400 mr-0.5">$</span>
                             <input 
                               type="number" 
                               value={existing?.price}
                               onChange={(e) => updateItemPrice(p.id, Math.max(0, Number(e.target.value)))}
-                              className="w-full bg-transparent outline-none text-xs font-bold text-slate-800 p-0 focus:ring-0 text-right"
+                              className="w-full bg-transparent outline-none text-[11px] font-bold text-slate-800 p-0 focus:ring-0 text-right"
                             />
                           </div>
                         </div>
@@ -1283,14 +1276,14 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
             </div>
 
             {/* Tally & closing overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-slate-900 p-3.5 flex justify-between items-center shadow-2xl border-t border-slate-850 shrink-0">
+            <div className="absolute bottom-0 left-0 right-0 bg-slate-900 p-2.5 px-3 flex justify-between items-center shadow-2xl border-t border-slate-850 shrink-0">
               <div className="text-left text-white">
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide">Total ({quoteItems.reduce((acc, i) => acc + i.qty, 0)} items)</p>
-                <p className="text-sm font-black text-emerald-400">{formatCurrency(total)}</p>
+                <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wide">Total ({quoteItems.reduce((acc, i) => acc + i.qty, 0)} uds)</p>
+                <p className="text-xs font-black text-emerald-400">{formatCurrency(total)}</p>
               </div>
               <button
                 onClick={() => setIsMobileSearchOpen(false)}
-                className="bg-sky-600 text-white hover:bg-sky-500 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+                className="bg-sky-600 text-white hover:bg-sky-500 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
               >
                 Listo ({quoteItems.length} prod.)
               </button>
@@ -1617,31 +1610,34 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md"
+            className="fixed inset-0 z-[110] flex items-start md:items-center justify-center p-2 md:p-4 bg-slate-900/40 backdrop-blur-md overflow-y-auto"
           >
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.95, opacity: 0, y: -15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[85vh]"
+              className="bg-white w-full max-w-xl rounded-xl md:rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[95vh] md:max-h-[85vh] mt-1 md:mt-0"
             >
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="p-3 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                 <div>
-                   <h2 className="text-xl font-black text-slate-800 tracking-tight">Seleccionar Cliente</h2>
-                   <p className="text-xs text-slate-500 font-medium tracking-wide">Busque un cliente registrado o cree uno nuevo</p>
+                   <h2 className="text-sm md:text-xl font-black text-slate-800 tracking-tight">Seleccionar Cliente</h2>
+                   <p className="text-[10px] md:text-xs text-slate-500 font-medium tracking-wide">Busque un cliente registrado o cree uno nuevo</p>
                 </div>
-                <button onClick={() => setIsCustomerPickerOpen(false)} className="p-3 hover:bg-slate-200/50 text-slate-400 rounded-full transition-all">
-                  <X className="w-6 h-6" />
+                <button 
+                  onClick={() => setIsCustomerPickerOpen(false)} 
+                  className="p-1.5 md:p-3 hover:bg-slate-200/50 text-slate-400 rounded-full transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4 md:w-6 md:h-6" />
                 </button>
               </div>
 
-              <div className="p-8 flex-1 overflow-y-auto">
-                <div className="flex gap-2 mb-6">
+              <div className="p-3 md:p-8 flex-1 overflow-y-auto">
+                <div className="flex gap-1.5 md:gap-2 mb-3 md:mb-6 shrink-0">
                   <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 md:w-5 md:h-5" />
                     <input 
                       type="text"
                       placeholder="Buscar por Nombre, RUT o Email..."
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none font-medium text-slate-600 placeholder:text-slate-300 transition-all shadow-inner"
+                      className="w-full pl-9 pr-3 py-2 md:pl-12 md:pr-4 md:py-4 bg-slate-50 border border-slate-150 rounded-lg md:rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none font-medium text-xs md:text-sm text-slate-700 placeholder:text-slate-300 transition-all shadow-inner"
                       value={searchCustomer}
                       onChange={(e) => setSearchCustomer(e.target.value)}
                       autoFocus
@@ -1652,13 +1648,14 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                       setEditingCustomer(null);
                       setIsCustomerModalOpen(true);
                     }}
-                    className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg hover:bg-sky-700 active:scale-95 transition-all"
+                    className="p-2 md:p-4 bg-sky-600 text-white rounded-lg md:rounded-2xl shadow-lg hover:bg-sky-700 active:scale-95 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                    title="Nuevo Cliente"
                   >
-                    <UserPlus className="w-6 h-6" />
+                    <UserPlus className="w-4 h-4 md:w-6 md:h-6" />
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1 md:space-y-2">
                   {customers
                     .filter(c => 
                       !searchCustomer || 
@@ -1676,18 +1673,18 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                             setSelectedCustomer(c);
                             setIsCustomerPickerOpen(false);
                           }}
-                          className="w-full group hover:bg-slate-50 p-4 border border-slate-50 hover:border-slate-200 rounded-2xl transition-all text-left flex items-center justify-between"
+                          className="w-full group hover:bg-slate-50 p-2 md:p-4 border border-slate-50 hover:border-slate-200 rounded-lg md:rounded-2xl transition-all text-left flex items-center justify-between cursor-pointer"
                         >
-                           <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-sm group-hover:bg-sky-100 group-hover:text-sky-600 transition-colors">
+                           <div className="flex items-center gap-2 md:gap-4">
+                             <div className="w-7 h-7 md:w-10 md:h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-extrabold text-[10px] md:text-sm shrink-0 group-hover:bg-sky-100 group-hover:text-sky-600 transition-colors">
                                {mainLabel.charAt(0)}
                              </div>
-                             <div>
-                                <p className="font-bold text-slate-800 text-sm">{mainLabel}</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{subLabel}</p>
+                             <div className="ml-2.5 min-w-0">
+                                <p className="font-bold text-slate-800 text-[11px] md:text-sm truncate leading-tight">{mainLabel}</p>
+                                <p className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{subLabel}</p>
                              </div>
                            </div>
-                           <ChevronRight className="w-5 h-5 text-slate-200 group-hover:text-slate-400 group-hover:translate-x-1 transition-all" />
+                           <ChevronRight className="w-3.5 h-3.5 md:w-5 md:h-5 text-slate-200 group-hover:text-slate-400 group-hover:translate-x-1 transition-all shrink-0" />
                         </button>
                       )})}
                   
@@ -1696,10 +1693,10 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                     (c.name?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) || 
                     (c.rut?.toLowerCase() || '').includes(searchCustomer.toLowerCase())
                   ).length === 0 && (
-                    <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
-                       <UserPlus className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                       <p className="text-sm font-bold text-slate-400">No se encontraron clientes coincidentes</p>
-                       <p className="text-[10px] text-slate-300 uppercase tracking-widest mt-1">Intente con otros términos o cree uno nuevo</p>
+                    <div className="text-center py-10 md:py-20 bg-slate-50 rounded-xl md:rounded-[2rem] border border-dashed border-slate-200">
+                       <UserPlus className="w-8 h-8 md:w-12 md:h-12 text-slate-200 mx-auto mb-2 md:mb-4" />
+                       <p className="text-xs font-bold text-slate-400">No se encontraron clientes coincidentes</p>
+                       <p className="text-[8px] md:text-[10px] text-slate-300 uppercase tracking-widest mt-0.5">Intente con otros términos o cree uno nuevo</p>
                     </div>
                   )}
                 </div>
