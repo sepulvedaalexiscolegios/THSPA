@@ -35,18 +35,92 @@ export function SalesView() {
 
   const fetchData = async () => {
     try {
-      // Need both sales and quotations to find correlatives
-      const [sRes, qRes, cRes, tRes] = await Promise.all([
-        supabase.from('sales').select('*').order('date', { ascending: false }),
-        supabase.from('quotations').select('*').order('date', { ascending: false }),
-        supabase.from('customers').select('*').order('name'),
-        supabase.from('transports').select('*').order('name')
-      ]);
-      
-      if (sRes.data) setSales(sRes.data);
-      if (qRes.data) setQuotations(qRes.data);
-      if (cRes.data) setCustomers(cRes.data);
-      if (tRes.data) setTransports(tRes.data);
+      console.log('Fetching all necessary data for SalesView...');
+
+      // 1. Fetch customers in chunks to bypass Supabase 1000 limit
+      let allCustomers: Customer[] = [];
+      let cFrom = 0;
+      const cLimit = 1000;
+      let cHasMore = true;
+      while (cHasMore) {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .order('name')
+          .range(cFrom, cFrom + cLimit - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allCustomers = [...allCustomers, ...data];
+          if (data.length < cLimit) {
+            cHasMore = false;
+          } else {
+            cFrom += cLimit;
+          }
+        } else {
+          cHasMore = false;
+        }
+      }
+
+      // 2. Fetch sales in chunks to bypass Supabase 1000 limit
+      let allSales: Sale[] = [];
+      let sFrom = 0;
+      const sLimit = 1000;
+      let sHasMore = true;
+      while (sHasMore) {
+        const { data, error } = await supabase
+          .from('sales')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(sFrom, sFrom + sLimit - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allSales = [...allSales, ...data];
+          if (data.length < sLimit) {
+            sHasMore = false;
+          } else {
+            sFrom += sLimit;
+          }
+        } else {
+          sHasMore = false;
+        }
+      }
+
+      // 3. Fetch quotations in chunks to bypass Supabase 1000 limit
+      let allQuotations: any[] = [];
+      let qFrom = 0;
+      const qLimit = 1000;
+      let qHasMore = true;
+      while (qHasMore) {
+        const { data, error } = await supabase
+          .from('quotations')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(qFrom, qFrom + qLimit - 1);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allQuotations = [...allQuotations, ...data];
+          if (data.length < qLimit) {
+            qHasMore = false;
+          } else {
+            qFrom += qLimit;
+          }
+        } else {
+          qHasMore = false;
+        }
+      }
+
+      // 4. Fetch transports
+      const { data: tData, error: tError } = await supabase
+        .from('transports')
+        .select('*')
+        .order('name');
+      if (tError) throw tError;
+
+      setSales(allSales);
+      setQuotations(allQuotations);
+      setCustomers(allCustomers);
+      if (tData) setTransports(tData);
+
     } catch (error) {
       console.warn('Error fetching data in SalesView:', error);
     }
@@ -262,7 +336,6 @@ export function SalesView() {
               
               <h2>DESTINATARIO</h2>
               <p style="font-size: 11pt; font-weight: 900; margin: 4pt 0;">${displayCustomerName}</p>
-              <p>RUT: ${displayCustomerRut}</p>
               <p style="font-weight: 700; margin-top: 4pt;">DIRECCIÓN: ${saleCustomer?.address || 'N/A'}</p>
               <p>TELÉFONO: ${saleCustomer?.phone || 'N/A'}</p>
               

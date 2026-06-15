@@ -1,55 +1,19 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-    function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
-    }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-    match /products/{productId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(productId);
-      allow delete: if isSignedIn();
-    }
+app.use(express.static(path.join(__dirname, 'dist')));
 
-    match /customers/{customerId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(customerId);
-      allow delete: if isSignedIn();
-    }
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
-    match /quotations/{quotationId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(quotationId);
-      allow delete: if isSignedIn();
-    }
-
-    match /sales/{saleId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(saleId);
-      allow delete: if isSignedIn();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    match /subcategories/{subcategoryId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-    
-    match /test/connection {
-      allow read: if true;
-    }
-  }
-}
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

@@ -1,46 +1,47 @@
-{
-  "name": "react-example",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
-    "start": "node server.js",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@google/genai": "^2.4.0",
-    "@supabase/supabase-js": "^2.106.2",
-    "@tailwindcss/vite": "^4.1.14",
-    "@vis.gl/react-google-maps": "^1.8.3",
-    "@vitejs/plugin-react": "^5.0.4",
-    "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "firebase": "^12.14.0",
-    "html5-qrcode": "^2.3.8",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
-    "lucide-react": "^0.546.0",
-    "motion": "^12.23.24",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
-    "tailwind-merge": "^3.6.0",
-    "vite": "^6.2.3",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.14.0",
-    "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
-    "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.3"
-  }
-}
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import {defineConfig} from 'vite';
+
+export default defineConfig(() => {
+  return {
+    plugins: [react(), tailwindcss()],
+    base: './', // Genera rutas relativas para que funcione en cualquier subcarpeta de Hostinger
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
+      },
+    },
+    build: {
+      chunkSizeWarningLimit: 2000, // Eleva el límite para evitar avisos alarmantes
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            // Separa las librerías grandes para que Hostinger no tenga problemas cargando un archivo gigante
+            if (id.includes('node_modules')) {
+              if (id.includes('jspdf') || id.includes('jspdf-autotable') || id.includes('html5-qrcode')) {
+                return 'pdf-scanner-libs';
+              }
+              if (id.includes('xlsx')) {
+                return 'xlsx-lib';
+              }
+              if (id.includes('supabase') || id.includes('@supabase')) {
+                return 'supabase-lib';
+              }
+              if (id.includes('react') || id.includes('react-dom') || id.includes('motion')) {
+                return 'core-vendor';
+              }
+            }
+          }
+        }
+      }
+    },
+    server: {
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      hmr: process.env.DISABLE_HMR !== 'true',
+      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
+      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+  };
+});

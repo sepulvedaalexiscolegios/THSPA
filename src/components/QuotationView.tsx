@@ -8,6 +8,16 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+
+const normText = (str: string | undefined | null) => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ñ/g, 'n');
+};
+
 export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -45,6 +55,9 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   // Transport State
   const [isTransportModalOpen, setIsTransportModalOpen] = useState(false);
   const [transportValue, setTransportValue] = useState<string>('');
+
+  // Customer Correlative State (replicated from CustomerView)
+  const [nextCorrelativeCode, setNextCorrelativeCode] = useState('2368');
 
   const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' = 'error') => {
     setAlertConfig({ title, message, type });
@@ -95,6 +108,84 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
     }
     handleAddTransportItem(val);
     setIsTransportModalOpen(false);
+  };
+
+  const loadNextCorrelative = async () => {
+    try {
+      const rutsSet = new Set<string>();
+
+      // 1. Get exact total count of customers in the database
+      const { count } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true });
+
+      const totalRows = count || 2500; // Fallback to 2500 if count query fails
+      const chunkSize = 1000;
+      const numPages = Math.ceil(totalRows / chunkSize);
+
+      // 2. Fetch all customer RUTs in parallel pages to be absolutely sure we scan the entire database
+      const promises = [];
+      for (let i = 0; i < numPages; i++) {
+        const from = i * chunkSize;
+        const to = from + chunkSize - 1;
+        promises.push(
+          supabase
+            .from('customers')
+            .select('rut')
+            .range(from, to)
+        );
+      }
+
+      const results = await Promise.all(promises);
+      results.forEach(({ data, error }) => {
+        if (!error && data) {
+          data.forEach(c => {
+            if (c.rut) {
+              rutsSet.add(c.rut);
+            }
+          });
+        }
+      });
+
+      if (rutsSet.size > 0) {
+        let maxNum = 1000;
+
+        rutsSet.forEach(rut => {
+          const trimmed = rut.trim();
+
+          // Parse CLI-XXXX or CLIXXXX (case-insensitive, with or without hyphen)
+          const matchCLI = trimmed.match(/^cli-?(\d+)$/i);
+          if (matchCLI) {
+            const num = parseInt(matchCLI[1], 10);
+            if (!isNaN(num) && num > maxNum) {
+              maxNum = num;
+            }
+            return;
+          }
+
+          // Parse pure numeric values (under 1,000,000 to avoid conflicts with Chilean RUTs)
+          const matchPureNumeric = trimmed.match(/^(\d+)$/);
+          if (matchPureNumeric) {
+            const num = parseInt(matchPureNumeric[1], 10);
+            if (!isNaN(num) && num > maxNum && num < 1000000) {
+              maxNum = num;
+            }
+          }
+        });
+
+        // Always suggest the next code formatted as a pure numeric value as requested
+        setNextCorrelativeCode(`${maxNum + 1}`);
+      } else {
+        setNextCorrelativeCode('2368');
+      }
+    } catch (err) {
+      console.error('Error loading next correlative:', err);
+      setNextCorrelativeCode('2368');
+    }
+  };
+
+  const getNextCorrelativeCode = () => {
+    return nextCorrelativeCode;
   };
 
   useEffect(() => {
@@ -175,8 +266,8 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
     return { mainLabel, subLabel };
   };
 
-  // Use global search if provided, otherwise local search
-  const effectiveSearch = globalSearch !== undefined ? globalSearch : searchTerm;
+  // Use global search if provided (e.g. from global dashboard), otherwise use local search
+  const effectiveSearch = globalSearch || searchTerm;
 
   const filteredQuotations = quotations.filter(q => {
     const customer = customers.find(c => c.id === q.customer_id);
@@ -200,13 +291,24 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
     const customerEmailNorm = customer ? norm(customer.email || '') : '';
     const customCustomerNameNorm = norm(q.customer_name || '');
     
+    // Clean search string for numerical match to handle searches like "#20101", "n° 20101", etc.
+    let numberSearch = searchNorm;
+    if (numberSearch.startsWith('#')) {
+      numberSearch = numberSearch.slice(1).trim();
+    } else if (numberSearch.startsWith('n°') || numberSearch.startsWith('nº')) {
+      numberSearch = numberSearch.slice(2).trim();
+    } else if (numberSearch.startsWith('no')) {
+      numberSearch = numberSearch.startsWith('no.') ? numberSearch.slice(3).trim() : numberSearch.slice(2).trim();
+    }
+    
     return mainLabelNorm.includes(searchNorm) || 
            subLabelNorm.includes(searchNorm) || 
            customerNameNorm.includes(searchNorm) ||
            customerRutNorm.includes(searchNorm) ||
            customerEmailNorm.includes(searchNorm) ||
            customCustomerNameNorm.includes(searchNorm) ||
-           qNumber.toString().includes(searchNorm);
+           qNumber.toString().includes(searchNorm) ||
+           (numberSearch && qNumber.toString().includes(numberSearch));
   });
 
   const fetchData = async () => {
@@ -239,31 +341,56 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
         }
       }
 
-      const [qRes, cRes, catRes, subRes] = await Promise.all([
+      // Fetch customers in chunks to bypass the Supabase 1000-row limit
+      let allCustomers: Customer[] = [];
+      let cFrom = 0;
+      const cLimit = 1000;
+      let cHasMore = true;
+
+      while (cHasMore) {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .order('name')
+          .range(cFrom, cFrom + cLimit - 1);
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allCustomers = [...allCustomers, ...data];
+          if (data.length < cLimit) {
+            cHasMore = false;
+          } else {
+            cFrom += cLimit;
+          }
+        } else {
+          cHasMore = false;
+        }
+      }
+
+      const [qRes, catRes, subRes] = await Promise.all([
         supabase.from('quotations').select('*').order('date', { ascending: false }),
-        supabase.from('customers').select('*').order('name'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('subcategories').select('*').order('name')
       ]);
 
       if (qRes.error) console.error('Error fetching quotations:', qRes.error);
-      if (cRes.error) console.error('Error fetching customers:', cRes.error);
       if (catRes.error) console.error('Error fetching categories:', catRes.error);
       if (subRes.error) console.error('Error fetching subcategories:', subRes.error);
 
       if (qRes.data) setQuotations(qRes.data);
-      if (cRes.data) setCustomers(cRes.data);
+      setCustomers(allCustomers);
       setProducts(allProducts);
       if (catRes.data) setCategories(catRes.data);
       if (subRes.data) setSubcategories(subRes.data);
 
       console.log('Data loaded:', {
         quotations: qRes.data?.length,
-        customers: cRes.data?.length,
+        customers: allCustomers.length,
         products: allProducts.length,
         categories: catRes.data?.length,
         subcategories: subRes.data?.length
       });
+      loadNextCorrelative();
     } catch (err: any) {
       console.error('Error fetching quotation data:', err);
     }
@@ -460,9 +587,13 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const handleSaveCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    let rutVal = (formData.get('rut') as string || '').trim();
+    if (!rutVal) {
+      rutVal = getNextCorrelativeCode();
+    }
     const data = {
       name: formData.get('name') as string,
-      rut: formData.get('rut') as string,
+      rut: rutVal,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       address: formData.get('address') as string,
@@ -478,16 +609,63 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
           setSearchCustomer(data.name);
         }
       } else {
-        const { data: newCustomer, error } = await supabase.from('customers').insert([data]).select().single();
-        if (error) throw error;
-        if (newCustomer) {
-          setSelectedCustomer(newCustomer);
-          setSearchCustomer(newCustomer.name);
+        let success = false;
+        let attempt = 0;
+        let currentRut = data.rut;
+        let errToThrow = null;
+        let createdCustomer = null;
+
+        while (!success && attempt < 5) {
+          const { data: newCustomer, error } = await supabase
+            .from('customers')
+            .insert([{ ...data, rut: currentRut }])
+            .select()
+            .single();
+
+          if (!error) {
+            success = true;
+            createdCustomer = newCustomer;
+          } else {
+            const isDuplicate = error.code === '23505' || (error.message && error.message.toLowerCase().includes('duplicate'));
+            const isAutogeneratedPattern = /^cli-?(\d+)$/i.test(currentRut) || (/^\d+$/.test(currentRut) && parseInt(currentRut, 10) < 1000000);
+            
+            if (isDuplicate && isAutogeneratedPattern) {
+              attempt++;
+              let prefix = 'CLI';
+              let numStr = '';
+              const matchWithHyphen = currentRut.match(/^cli-(\d+)$/i);
+              const matchNoHyphen = currentRut.match(/^cli(\d+)$/i);
+              const matchPureNumeric = currentRut.match(/^(\d+)$/);
+
+              if (matchWithHyphen) {
+                prefix = 'CLI-';
+                numStr = matchWithHyphen[1];
+              } else if (matchNoHyphen) {
+                prefix = 'CLI';
+                numStr = matchNoHyphen[1];
+              } else if (matchPureNumeric) {
+                prefix = '';
+                numStr = matchPureNumeric[1];
+              }
+
+              const nextNum = parseInt(numStr, 10) + 1;
+              currentRut = `${prefix}${nextNum}`;
+              console.log(`Duplicate customer code detected, retrying with incremented code: ${currentRut} (attempt ${attempt})`);
+            } else {
+              errToThrow = error;
+              break;
+            }
+          }
+        }
+        if (!success && errToThrow) throw errToThrow;
+        if (createdCustomer) {
+          setSelectedCustomer(createdCustomer);
+          setSearchCustomer(createdCustomer.name);
         }
       }
       setIsCustomerModalOpen(false);
       setEditingCustomer(null);
-      fetchData();
+      await fetchData();
       showAlert("Cliente Guardado", `El cliente ha sido ${editingCustomer ? 'actualizado' : 'registrado'} correctamente.`, "success");
     } catch (err: any) {
       showAlert("Error", 'Error al guardar cliente: ' + err.message);
@@ -1541,7 +1719,12 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                   </button>
                 </div>
                 
-                <form onSubmit={handleSaveCustomer} className="space-y-3">
+                <form 
+                  key={editingCustomer ? `edit-${editingCustomer.id}` : `new-${nextCorrelativeCode}`} 
+                  id="customerForm" 
+                  onSubmit={handleSaveCustomer} 
+                  className="space-y-3"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-2">
                        <div>
@@ -1549,37 +1732,37 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                          <input name="name" defaultValue={editingCustomer?.name} required className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                        <div>
-                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT o Código</label>
-                         <input name="rut" defaultValue={editingCustomer?.rut} required placeholder="12.345.678-9" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">RUT o Código (Opcional - Sugerido)</label>
+                         <input name="rut" defaultValue={editingCustomer ? editingCustomer.rut : getNextCorrelativeCode()} placeholder="12.345.678-9 o Autogenerado" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                     </div>
                     <div className="space-y-2">
                        <div>
-                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono</label>
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Teléfono Móvil</label>
                          <input name="phone" type="tel" defaultValue={editingCustomer?.phone} placeholder="+569..." className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                        <div>
-                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email</label>
-                         <input name="email" type="email" defaultValue={editingCustomer?.email} className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
+                         <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Email (Opcional)</label>
+                         <input name="email" type="email" defaultValue={editingCustomer?.email} placeholder="ejemplo@correo.com" className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" />
                        </div>
                     </div>
                     
                     <div className="md:col-span-2">
-                      <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
-                      <input 
-                        name="address" 
-                        defaultValue={editingCustomer?.address} 
-                        placeholder="Calle, Número, Comuna"
-                        className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
-                      />
+                       <label className="block text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 px-1">Dirección de Despacho</label>
+                       <input 
+                         name="address" 
+                         defaultValue={editingCustomer?.address} 
+                         placeholder="Calle, Número, Comuna"
+                         className="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-md text-[13px] md:text-xs focus:ring-1 focus:ring-sky-500 outline-none transition-all" 
+                       />
                     </div>
                   </div>
-
+ 
                   <div className="flex gap-2 pt-2">
                     <button 
                       type="button" 
                       onClick={() => { setIsCustomerModalOpen(false); setEditingCustomer(null); }}
-                      className="flex-1 px-4 py-3 md:py-2 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all"
+                      className="flex-1 px-4 py-3 md:py-2 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:text-slate-700 transition-all border border-transparent"
                     >
                       Cancelar
                     </button>
@@ -1764,12 +1947,17 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
 
                 <div className="space-y-1 md:space-y-2">
                   {customers
-                    .filter(c => 
-                      !searchCustomer || 
-                      (c.name?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) || 
-                      (c.rut?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) ||
-                      (c.email?.toLowerCase() || '').includes(searchCustomer.toLowerCase())
-                    )
+                    .filter(c => {
+                      if (!searchCustomer) return true;
+                      const qNorm = normText(searchCustomer);
+                      const { mainLabel, subLabel } = getCustomerLabels(c);
+                      return normText(c.name).includes(qNorm) || 
+                             normText(c.rut).includes(qNorm) || 
+                             normText(c.email).includes(qNorm) || 
+                             normText(c.address).includes(qNorm) ||
+                             normText(mainLabel).includes(qNorm) ||
+                             normText(subLabel).includes(qNorm);
+                    })
                     .slice(0, 50)
                     .map(c => {
                       const { mainLabel, subLabel } = getCustomerLabels(c);
@@ -1795,11 +1983,17 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                         </button>
                       )})}
                   
-                  {customers.filter(c => 
-                    !searchCustomer || 
-                    (c.name?.toLowerCase() || '').includes(searchCustomer.toLowerCase()) || 
-                    (c.rut?.toLowerCase() || '').includes(searchCustomer.toLowerCase())
-                  ).length === 0 && (
+                  {customers.filter(c => {
+                    if (!searchCustomer) return true;
+                    const qNorm = normText(searchCustomer);
+                    const { mainLabel, subLabel } = getCustomerLabels(c);
+                    return normText(c.name).includes(qNorm) || 
+                           normText(c.rut).includes(qNorm) || 
+                           normText(c.email).includes(qNorm) || 
+                           normText(c.address).includes(qNorm) ||
+                           normText(mainLabel).includes(qNorm) ||
+                           normText(subLabel).includes(qNorm);
+                  }).length === 0 && (
                     <div className="text-center py-10 md:py-20 bg-slate-50 rounded-xl md:rounded-[2rem] border border-dashed border-slate-200">
                        <UserPlus className="w-8 h-8 md:w-12 md:h-12 text-slate-200 mx-auto mb-2 md:mb-4" />
                        <p className="text-xs font-bold text-slate-400">No se encontraron clientes coincidentes</p>
