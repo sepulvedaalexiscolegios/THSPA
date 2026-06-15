@@ -1,6 +1,6 @@
-{
-  "name": "Cotizador TH Comercial",
-  "description": "Sistema integral de gestión de inventario, clientes y ventas para TH Comercial. Incluye escaneo de códigos de barras, cotizaciones vía WhatsApp y etiquetas de envío.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
+# Supabase Configuration
+VITE_SUPABASE_URL=YOUR_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+
+# Gemini API Key
+GEMINI_API_KEY=

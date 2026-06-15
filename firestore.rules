@@ -1,55 +1,17 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
+import { createClient } from '@supabase/supabase-js';
 
-    function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
-    }
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
+// Use placeholders if keys are missing to prevent library from crashing on startup
+// The app will still fail on actual requests, which is handled gracefully in UI components via try/catch
+const client = createClient(
+  supabaseUrl || 'https://placeholder-project.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+);
 
-    match /products/{productId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(productId);
-      allow delete: if isSignedIn();
-    }
-
-    match /customers/{customerId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(customerId);
-      allow delete: if isSignedIn();
-    }
-
-    match /quotations/{quotationId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(quotationId);
-      allow delete: if isSignedIn();
-    }
-
-    match /sales/{saleId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(saleId);
-      allow delete: if isSignedIn();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    match /subcategories/{subcategoryId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-    
-    match /test/connection {
-      allow read: if true;
-    }
-  }
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase credentials missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in settings.');
 }
+
+export const supabase = client;
