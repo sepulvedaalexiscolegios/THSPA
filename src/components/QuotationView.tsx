@@ -18,6 +18,32 @@ const normText = (str: string | undefined | null) => {
     .replace(/ñ/g, 'n');
 };
 
+const isDiscountItem = (sku?: string, name?: string) => {
+  const s = (sku || '').toUpperCase().trim();
+  const n = (name || '').toUpperCase().trim();
+  
+  const hasDiscountSku = 
+    s === 'DESCUENTO' || s.startsWith('DESCUENTO-') || s.startsWith('DESCUENTO_') ||
+    s === 'DCTO' || s.startsWith('DCTO-') || s.startsWith('DCTO_') ||
+    s === 'DESC' || s.startsWith('DESC-') || s.startsWith('DESC_') ||
+    s === 'PROMO' || s.startsWith('PROMO-') || s.startsWith('PROMO_') ||
+    s === 'CUPON' || s === 'CUPÓN' || s.startsWith('CUPON-') || s.startsWith('CUPÓN-');
+
+  const hasDiscountName = 
+    n.includes('DESCUENTO') || 
+    n.includes('DCTO') || 
+    n.includes('CUPON') || 
+    n.includes('CUPÓN') || 
+    n.includes('PROMO');
+
+  return hasDiscountSku || hasDiscountName;
+};
+
+const getSubtotal = (qty: number, price: number, sku?: string, name?: string) => {
+  const base = qty * price;
+  return isDiscountItem(sku, name) ? -Math.abs(base) : base;
+};
+
 export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -416,7 +442,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
       const newQty = existing.qty + 1;
       const unitPrice = getEffectivePrice(p, newQty);
       setQuoteItems(quoteItems.map(i => 
-        i.productId === p.id ? { ...i, qty: newQty, price: unitPrice, subtotal: newQty * unitPrice } : i
+        i.productId === p.id ? { ...i, qty: newQty, price: unitPrice, subtotal: getSubtotal(newQty, unitPrice, i.sku, i.name) } : i
       ));
     } else {
       const unitPrice = getEffectivePrice(p, 1);
@@ -426,7 +452,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
         sku: p.sku,
         qty: 1,
         price: unitPrice,
-        subtotal: unitPrice
+        subtotal: getSubtotal(1, unitPrice, p.sku, p.name)
       }]);
     }
   };
@@ -441,7 +467,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
       if (item.productId === productId) {
         const newQty = Math.max(1, item.qty + delta);
         const unitPrice = getEffectivePrice(product, newQty);
-        return { ...item, qty: newQty, price: unitPrice, subtotal: newQty * unitPrice };
+        return { ...item, qty: newQty, price: unitPrice, subtotal: getSubtotal(newQty, unitPrice, item.sku, item.name) };
       }
       return item;
     }));
@@ -450,7 +476,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
   const updateItemPrice = (productId: string, newPrice: number) => {
     setQuoteItems(quoteItems.map(item => {
       if (item.productId === productId) {
-        return { ...item, price: newPrice, subtotal: item.qty * newPrice };
+        return { ...item, price: newPrice, subtotal: getSubtotal(item.qty, newPrice, item.sku, item.name) };
       }
       return item;
     }));
@@ -1341,25 +1367,55 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
 
                 {/* Right Side: Cart (Desktop only) */}
                 <div className="hidden md:flex bg-slate-900 text-slate-100 rounded-2xl md:rounded-3xl p-4 md:p-6 flex-col">
-                  <div className="flex justify-between items-center mb-3 md:mb-4">
+                  <div className="flex justify-between items-center mb-3 md:mb-4 gap-2">
                     <h3 className="text-[10px] md:text-sm font-bold text-slate-400 uppercase tracking-widest">Resumen</h3>
-                    {quoteItems.length > 0 && (
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={openTransportModal}
-                        className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg text-[9px] uppercase font-black tracking-wider transition-all cursor-pointer shadow-sm border border-slate-700/50"
-                        title="Agregar Transporte"
+                        onClick={() => {
+                          const input = document.querySelector('input[placeholder="Buscar SKU o Nombre..."]') as HTMLInputElement;
+                          if (input) {
+                            input.focus();
+                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }
+                        }}
+                        className="flex items-center gap-1.5 bg-sky-650 hover:bg-sky-600 text-white px-2.5 py-1 rounded-lg text-[9px] uppercase font-black tracking-wider transition-all cursor-pointer shadow-sm border border-sky-700/50"
+                        title="Buscar y Agregar Producto"
                       >
-                        <Truck className="w-3.5 h-3.5 text-sky-400" />
-                        <span>+ Transporte</span>
+                        <Plus className="w-3.5 h-3.5 text-sky-200" />
+                        <span>+ Producto</span>
                       </button>
-                    )}
+                      {quoteItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={openTransportModal}
+                          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg text-[9px] uppercase font-black tracking-wider transition-all cursor-pointer shadow-sm border border-slate-700/50"
+                          title="Agregar Transporte"
+                        >
+                          <Truck className="w-3.5 h-3.5 text-sky-400" />
+                          <span>+ Transporte</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="flex-1 space-y-2 md:space-y-3 mb-4 md:mb-6 overflow-y-auto">
                     {quoteItems.length === 0 && (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2 py-8">
+                      <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 py-8">
                         <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 opacity-30 text-slate-400" />
                         <p className="text-xs md:text-sm">Sin productos seleccionados</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('input[placeholder="Buscar SKU o Nombre..."]') as HTMLInputElement;
+                            if (input) {
+                              input.focus();
+                              input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                          }}
+                          className="bg-sky-650 hover:bg-sky-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
+                        >
+                          Buscar Productos
+                        </button>
                       </div>
                     )}
                     {quoteItems.map(item => (
@@ -1573,7 +1629,19 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 </h3>
                 <p className="text-[10px] font-bold text-slate-400">Verifica cantidades, precios y genera la cotización</p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileCartOpen(false);
+                    setIsMobileSearchOpen(true);
+                  }}
+                  className="px-2 py-1 bg-sky-600 hover:bg-sky-550 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all shrink-0 gap-1 shadow-sm border border-sky-700/50"
+                  title="Agregar Producto"
+                >
+                  <Plus className="w-3.5 h-3.5 text-white" />
+                  <span className="text-[10px] font-black uppercase">Prod</span>
+                </button>
                 {quoteItems.length > 0 && (
                   <button
                     type="button"
@@ -1592,7 +1660,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 </button>
               </div>
             </div>
-
+ 
             {/* Scrollable Cart items */}
             <div className="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1 pb-28 custom-scrollbar">
               {quoteItems.length > 0 && (
@@ -1606,9 +1674,19 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 </button>
               )}
               {quoteItems.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2 py-12">
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 py-12">
                   <ShoppingCart className="w-10 h-10 opacity-30 text-slate-500" />
                   <p className="text-xs">Sin productos seleccionados</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileCartOpen(false);
+                      setIsMobileSearchOpen(true);
+                    }}
+                    className="bg-sky-600 hover:bg-sky-500 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                  >
+                    Buscar y Agregar Productos
+                  </button>
                 </div>
               ) : (
                 quoteItems.map(item => (
@@ -1627,7 +1705,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-
+ 
                     <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-800/60">
                       {/* Quantity Selector */}
                       <div className="flex items-center gap-1.5">
@@ -1645,7 +1723,7 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
-
+ 
                       {/* Price input */}
                       <div className="flex items-center bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 max-w-[130px]">
                         <span className="text-xs font-bold text-slate-500 mr-1">$</span>
@@ -1661,33 +1739,45 @@ export function QuotationView({ globalSearch }: { globalSearch?: string }) {
                 ))
               )}
             </div>
-
+ 
             {/* Bottom save/checkout panel */}
             <div className="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 p-4 space-y-3 pb-safe shrink-0">
               <div className="flex justify-between items-center text-base font-extrabold text-white px-1">
                 <span>Total Cotización</span>
                 <span className="text-emerald-400 font-black">{formatCurrency(total)}</span>
               </div>
-              <button
-                onClick={() => {
-                  setIsMobileCartOpen(false);
-                  handleSaveQuotation();
-                }}
-                disabled={!selectedCustomer || quoteItems.length === 0}
-                className={cn(
-                  "w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center",
-                  (!selectedCustomer || quoteItems.length === 0)
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                    : "bg-sky-600 text-white hover:bg-sky-550 shadow-xl shadow-sky-950/20 active:scale-95"
-                )}
-              >
-                {!selectedCustomer 
-                  ? "Falta Elegir Cliente" 
-                  : quoteItems.length === 0 
-                    ? "Carrito Vacío" 
-                    : "Generar y Guardar"
-                }
-              </button>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileCartOpen(false);
+                    setIsMobileSearchOpen(true);
+                  }}
+                  className="w-full py-3.5 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center border border-slate-700/50"
+                >
+                  + Productos
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMobileCartOpen(false);
+                    handleSaveQuotation();
+                  }}
+                  disabled={!selectedCustomer || quoteItems.length === 0}
+                  className={cn(
+                    "w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center",
+                    (!selectedCustomer || quoteItems.length === 0)
+                      ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                      : "bg-sky-600 text-white hover:bg-sky-550 shadow-xl shadow-sky-950/20 active:scale-95"
+                  )}
+                >
+                  {!selectedCustomer 
+                    ? "Elegir Cliente" 
+                    : quoteItems.length === 0 
+                      ? "Vacío" 
+                      : "Guardar"
+                  }
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
